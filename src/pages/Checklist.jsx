@@ -24,6 +24,80 @@ const Checklist = () => {
   const [expandedCategory, setExpandedCategory] = useState('operativa');
   const [selectedChecklist, setSelectedChecklist] = useState(null);
 
+  // Datos de sucursales con desempeño por pilar
+  const sucursales = [
+    {
+      nombre: 'LEGUIZAMON',
+      pilares: {
+        ordenLimpieza: true,
+        serviciosClub: true,
+        gestionAdministrativa: true,
+        pedidosYa: true,
+        stockCaja: true
+      }
+    },
+    {
+      nombre: 'CATAMARCA',
+      pilares: {
+        ordenLimpieza: true,
+        serviciosClub: true,
+        gestionAdministrativa: true,
+        pedidosYa: true,
+        stockCaja: true
+      }
+    },
+    {
+      nombre: 'CONGRESO',
+      pilares: {
+        ordenLimpieza: true,
+        serviciosClub: true,
+        gestionAdministrativa: false,
+        pedidosYa: true,
+        stockCaja: true
+      }
+    },
+    {
+      nombre: 'ARENALES',
+      pilares: {
+        ordenLimpieza: true,
+        serviciosClub: false,
+        gestionAdministrativa: true,
+        pedidosYa: false,
+        stockCaja: true
+      }
+    },
+    {
+      nombre: 'BELGRANO SUR',
+      pilares: {
+        ordenLimpieza: false,
+        serviciosClub: true,
+        gestionAdministrativa: true,
+        pedidosYa: false,
+        stockCaja: true
+      }
+    },
+    {
+      nombre: 'LAPRIDA',
+      pilares: {
+        ordenLimpieza: false,
+        serviciosClub: true,
+        gestionAdministrativa: false,
+        pedidosYa: false,
+        stockCaja: true
+      }
+    },
+    {
+      nombre: 'VILLA CRESPO',
+      pilares: {
+        ordenLimpieza: null,
+        serviciosClub: null,
+        gestionAdministrativa: null,
+        pedidosYa: null,
+        stockCaja: null
+      }
+    }
+  ];
+
   // Plantillas de pilares predefinidas
   const checklistTemplates = {
     ordenLimpieza: {
@@ -173,6 +247,26 @@ const Checklist = () => {
         ]
       }
     ]
+  };
+
+  // Función para obtener el pilar correspondiente al checklist seleccionado
+  const getPilarFromChecklist = (checklistId) => {
+    if (!checklistId) return null;
+
+    const prefix = checklistId.split('-')[0];
+
+    switch (prefix) {
+      case 'OL':
+        return 'ordenLimpieza';
+      case 'SC':
+        return 'serviciosClub';
+      case 'GA':
+        return 'gestionAdministrativa';
+      case 'PY':
+        return 'pedidosYa';
+      default:
+        return 'stockCaja';
+    }
   };
 
   const getEstadoIcon = (estado) => {
@@ -349,6 +443,55 @@ const Checklist = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Desempeño por Sucursal */}
+              {(() => {
+                const pilarActual = getPilarFromChecklist(selectedChecklist);
+                if (!pilarActual) return null;
+
+                return (
+                  <div className="mb-6 p-4 bg-mascotera-darker rounded-lg">
+                    <h3 className="text-lg font-semibold text-mascotera-text mb-4 flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-mascotera-accent" />
+                      Desempeño por Sucursal
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {sucursales.map((sucursal, idx) => {
+                        const estado = sucursal.pilares[pilarActual];
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg border-2 transition-all ${
+                              estado === null
+                                ? 'border-mascotera-warning bg-mascotera-warning/5'
+                                : estado
+                                  ? 'border-mascotera-success bg-mascotera-success/5'
+                                  : 'border-mascotera-danger bg-mascotera-danger/5'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-mascotera-text">
+                                {sucursal.nombre}
+                              </span>
+                              <span
+                                className={`text-sm font-semibold ${
+                                  estado === null
+                                    ? 'text-mascotera-warning'
+                                    : estado
+                                      ? 'text-mascotera-success'
+                                      : 'text-mascotera-danger'
+                                }`}
+                              >
+                                {estado === null ? 'PENDIENTE' : estado ? 'APROBADO' : 'NO APROBADO'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Checklist Items */}
               <div className="space-y-6">
