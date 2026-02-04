@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos base */
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0a1628;
+  color: #e0e8f0;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d1f35;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a3a5c;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00d4aa;
+}
+
+/* Clases utilitarias personalizadas */
+@layer components {
+  .card-mascotera {
+    @apply bg-mascotera-card border border-mascotera-border rounded-xl p-6;
+  }
+
+  .btn-primary {
+    @apply bg-mascotera-accent text-mascotera-dark font-semibold px-6 py-3 rounded-lg
+           hover:bg-mascotera-accent-light transition-all duration-300
+           shadow-glow hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent border border-mascotera-accent text-mascotera-accent
+           font-semibold px-6 py-3 rounded-lg hover:bg-mascotera-accent/10
+           transition-all duration-300;
+  }
+
+  .input-mascotera {
+    @apply bg-mascotera-darker border border-mascotera-border rounded-lg px-4 py-3
+           text-mascotera-text placeholder-mascotera-text-muted
+           focus:outline-none focus:border-mascotera-accent focus:ring-1
+           focus:ring-mascotera-accent transition-all duration-300;
+  }
+
+  .title-yellow {
+    @apply text-mascotera-yellow font-display font-semibold tracking-wider;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-mascotera-text-muted
+           hover:text-mascotera-text hover:bg-mascotera-card transition-all duration-300
+           cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-mascotera-accent
+           bg-mascotera-accent/10 border-l-2 border-mascotera-accent;
+  }
+
+  .stat-card {
+    @apply bg-mascotera-card border border-mascotera-border rounded-xl p-5
+           hover:border-mascotera-accent/50 transition-all duration-300;
+  }
+
+  .table-mascotera {
+    @apply w-full border-collapse;
+  }
+
+  .table-mascotera th {
+    @apply text-left text-mascotera-text-muted font-medium py-3 px-4
+           border-b border-mascotera-border text-sm uppercase tracking-wider;
+  }
+
+  .table-mascotera td {
+    @apply py-4 px-4 border-b border-mascotera-border/50 text-mascotera-text;
+  }
+
+  .table-mascotera tr:hover td {
+    @apply bg-mascotera-card/50;
+  }
+
+  .badge {
+    @apply px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-success {
+    @apply bg-mascotera-success/20 text-mascotera-success;
+  }
+
+  .badge-warning {
+    @apply bg-mascotera-warning/20 text-mascotera-warning;
+  }
+
+  .badge-danger {
+    @apply bg-mascotera-danger/20 text-mascotera-danger;
+  }
+
+  .badge-info {
+    @apply bg-mascotera-info/20 text-mascotera-info;
+  }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Glow effect para elementos importantes */
+.glow-border {
+  position: relative;
+}
+
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, #00d4aa, #00ffcc, #f0c040, #00d4aa);
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.glow-border:hover::before {
+  opacity: 0.5;
+}
