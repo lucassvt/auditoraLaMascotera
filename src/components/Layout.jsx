@@ -34,8 +34,8 @@ const Layout = ({ children }) => {
     {
       path: '/checklist',
       icon: FileSearch,
-      label: 'Checklist',
-      description: 'Listas de control'
+      label: 'Pilares',
+      description: 'Pilares de control'
     },
     {
       path: '/reportes',

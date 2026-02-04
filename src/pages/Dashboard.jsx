@@ -28,50 +28,59 @@ import {
 } from 'recharts';
 
 const Dashboard = () => {
+  // Datos de desempeño por sucursal (pilares cumplidos de 5)
+  const sucursalesDesempeno = [
+    { nombre: 'LEGUIZAMON', pilaresCumplidos: 5, totalPilares: 5, cumplimiento: 100 },
+    { nombre: 'CATAMARCA', pilaresCumplidos: 5, totalPilares: 5, cumplimiento: 100 },
+    { nombre: 'CONGRESO', pilaresCumplidos: 4, totalPilares: 5, cumplimiento: 80 },
+    { nombre: 'ARENALES', pilaresCumplidos: 3, totalPilares: 5, cumplimiento: 60 },
+    { nombre: 'BELGRANO SUR', pilaresCumplidos: 3, totalPilares: 5, cumplimiento: 60 },
+    { nombre: 'LAPRIDA', pilaresCumplidos: 2, totalPilares: 5, cumplimiento: 40 },
+    { nombre: 'VILLA CRESPO', pilaresCumplidos: 0, totalPilares: 5, cumplimiento: 0, pendiente: true },
+  ].sort((a, b) => b.cumplimiento - a.cumplimiento);
+
+  // Calcular estadísticas generales
+  const totalSucursales = sucursalesDesempeno.length;
+  const sucursalesPendientes = sucursalesDesempeno.filter(s => s.pendiente).length;
+  const sucursalesEvaluadas = totalSucursales - sucursalesPendientes;
+  const pilaresCumplidosTotal = sucursalesDesempeno.filter(s => !s.pendiente).reduce((sum, s) => sum + s.pilaresCumplidos, 0);
+  const pilaresPosibles = sucursalesEvaluadas * 5;
+  const cumplimientoGeneral = pilaresPosibles > 0 ? Math.round((pilaresCumplidosTotal / pilaresPosibles) * 100) : 0;
+
   // Datos de ejemplo para las estadísticas
   const stats = [
     {
-      title: 'Auditorías Activas',
-      value: '12',
-      change: '+3',
+      title: 'Sucursales Evaluadas',
+      value: `${sucursalesEvaluadas}/${totalSucursales}`,
+      change: '+2',
       changeType: 'positive',
-      icon: ClipboardCheck,
+      icon: Building2,
       color: 'text-mascotera-accent'
     },
     {
-      title: 'Hallazgos Pendientes',
-      value: '24',
-      change: '-5',
+      title: 'Sucursales Pendientes',
+      value: `${sucursalesPendientes}`,
+      change: '-1',
       changeType: 'positive',
-      icon: AlertTriangle,
+      icon: Clock,
       color: 'text-mascotera-warning'
     },
     {
       title: 'Cumplimiento General',
-      value: '87%',
-      change: '+2.5%',
+      value: `${cumplimientoGeneral}%`,
+      change: '+5%',
       changeType: 'positive',
       icon: CheckCircle,
       color: 'text-mascotera-success'
     },
     {
-      title: 'Próximas a Vencer',
-      value: '5',
-      change: '+2',
-      changeType: 'negative',
-      icon: Clock,
-      color: 'text-mascotera-danger'
+      title: 'Pilares Cumplidos',
+      value: `${pilaresCumplidosTotal}/${pilaresPosibles}`,
+      change: '+8',
+      changeType: 'positive',
+      icon: TrendingUp,
+      color: 'text-mascotera-accent'
     },
-  ];
-
-  // Datos para gráfico de tendencia
-  const trendData = [
-    { mes: 'Jul', operativas: 8, financieras: 4, calidad: 6 },
-    { mes: 'Ago', operativas: 12, financieras: 6, calidad: 8 },
-    { mes: 'Sep', operativas: 10, financieras: 8, calidad: 7 },
-    { mes: 'Oct', operativas: 15, financieras: 10, calidad: 12 },
-    { mes: 'Nov', operativas: 14, financieras: 9, calidad: 10 },
-    { mes: 'Dic', operativas: 18, financieras: 12, calidad: 14 },
   ];
 
   // Datos para gráfico de estado
@@ -82,52 +91,43 @@ const Dashboard = () => {
     { name: 'Vencidas', value: 3, color: '#ef4444' },
   ];
 
-  // Datos de cumplimiento por área
-  const complianceByArea = [
-    { area: 'Sucursal Centro', cumplimiento: 92 },
-    { area: 'Sucursal Norte', cumplimiento: 88 },
-    { area: 'Sucursal Sur', cumplimiento: 85 },
-    { area: 'Almacén Principal', cumplimiento: 95 },
-    { area: 'Administración', cumplimiento: 90 },
-  ];
-
   // Auditorías recientes
   const recentAudits = [
     {
-      id: 'AUD-2024-001',
-      tipo: 'Operativa',
-      area: 'Sucursal Centro',
+      id: 'AUD-2026-001',
+      sucursal: 'LEGUIZAMON',
+      provincia: 'Buenos Aires',
       auditor: 'María García',
-      fecha: '15/12/2024',
-      estado: 'En Proceso',
-      cumplimiento: 78
-    },
-    {
-      id: 'AUD-2024-002',
-      tipo: 'Financiera',
-      area: 'Administración',
-      auditor: 'Carlos López',
-      fecha: '14/12/2024',
+      fecha: '04/02/2026',
       estado: 'Completada',
-      cumplimiento: 92
+      cumplimiento: 100
     },
     {
-      id: 'AUD-2024-003',
-      tipo: 'Calidad',
-      area: 'Almacén Principal',
+      id: 'AUD-2026-002',
+      sucursal: 'CATAMARCA',
+      provincia: 'Catamarca',
+      auditor: 'Carlos López',
+      fecha: '03/02/2026',
+      estado: 'Completada',
+      cumplimiento: 100
+    },
+    {
+      id: 'AUD-2026-003',
+      sucursal: 'CONGRESO',
+      provincia: 'CABA',
       auditor: 'Ana Martínez',
-      fecha: '12/12/2024',
+      fecha: '02/02/2026',
+      estado: 'Completada',
+      cumplimiento: 80
+    },
+    {
+      id: 'AUD-2026-004',
+      sucursal: 'VILLA CRESPO',
+      provincia: 'CABA',
+      auditor: 'Juan Pérez',
+      fecha: '01/02/2026',
       estado: 'Pendiente',
       cumplimiento: null
-    },
-    {
-      id: 'AUD-2024-004',
-      tipo: 'Operativa',
-      area: 'Sucursal Norte',
-      auditor: 'Juan Pérez',
-      fecha: '10/12/2024',
-      estado: 'Completada',
-      cumplimiento: 85
     },
   ];
 
@@ -139,15 +139,6 @@ const Dashboard = () => {
       'Vencida': 'badge-danger'
     };
     return badges[status] || 'badge-info';
-  };
-
-  const getTipoBadge = (tipo) => {
-    const badges = {
-      'Operativa': { icon: Building2, color: 'text-mascotera-accent' },
-      'Financiera': { icon: DollarSign, color: 'text-mascotera-warning' },
-      'Calidad': { icon: ShieldCheck, color: 'text-mascotera-success' }
-    };
-    return badges[tipo] || { icon: ClipboardCheck, color: 'text-mascotera-text-muted' };
   };
 
   return (
@@ -198,117 +189,49 @@ const Dashboard = () => {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Trend Chart */}
-        <div className="lg:col-span-2 card-mascotera">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-mascotera-text">
-              Tendencia de Auditorías
-            </h3>
-            <div className="flex items-center gap-4 text-sm">
-              <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-mascotera-accent"></span>
-                Operativas
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-mascotera-warning"></span>
-                Financieras
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-mascotera-success"></span>
-                Calidad
-              </span>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={trendData}>
-              <defs>
-                <linearGradient id="colorOperativas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00d4aa" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#00d4aa" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorFinancieras" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorCalidad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a3a5c" />
-              <XAxis dataKey="mes" stroke="#6b8299" />
-              <YAxis stroke="#6b8299" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0d1f35',
-                  border: '1px solid #1a3a5c',
-                  borderRadius: '8px'
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="operativas"
-                stroke="#00d4aa"
-                fillOpacity={1}
-                fill="url(#colorOperativas)"
-              />
-              <Area
-                type="monotone"
-                dataKey="financieras"
-                stroke="#f59e0b"
-                fillOpacity={1}
-                fill="url(#colorFinancieras)"
-              />
-              <Area
-                type="monotone"
-                dataKey="calidad"
-                stroke="#10b981"
-                fillOpacity={1}
-                fill="url(#colorCalidad)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
+      <div className="grid grid-cols-1 gap-6">
         {/* Status Pie Chart */}
         <div className="card-mascotera">
           <h3 className="text-lg font-semibold text-mascotera-text mb-6">
             Estado de Auditorías
           </h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={statusData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {statusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0d1f35',
-                  border: '1px solid #1a3a5c',
-                  borderRadius: '8px'
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="grid grid-cols-2 gap-2 mt-4">
+          <div className="flex items-center justify-center">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={statusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={80}
+                  outerRadius={110}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0d1f35',
+                    border: '1px solid #1a3a5c',
+                    borderRadius: '8px'
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-4 gap-4 mt-6">
             {statusData.map((item, index) => (
-              <div key={index} className="flex items-center gap-2 text-sm">
-                <span
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                ></span>
-                <span className="text-mascotera-text-muted">{item.name}</span>
-                <span className="font-semibold text-mascotera-text">{item.value}</span>
+              <div key={index} className="text-center p-3 bg-mascotera-darker rounded-lg">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  ></span>
+                  <span className="font-bold text-2xl text-mascotera-text">{item.value}</span>
+                </div>
+                <span className="text-sm text-mascotera-text-muted">{item.name}</span>
               </div>
             ))}
           </div>
@@ -317,25 +240,47 @@ const Dashboard = () => {
 
       {/* Compliance & Recent Audits */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Compliance by Area */}
+        {/* Ranking de Sucursales por Desempeño */}
         <div className="card-mascotera">
           <h3 className="text-lg font-semibold text-mascotera-text mb-6">
-            Cumplimiento por Área
+            Ranking de Sucursales por Desempeño
           </h3>
-          <div className="space-y-4">
-            {complianceByArea.map((item, index) => (
-              <div key={index}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-mascotera-text">{item.area}</span>
-                  <span className="font-semibold text-mascotera-accent">
-                    {item.cumplimiento}%
-                  </span>
+          <div className="space-y-3">
+            {sucursalesDesempeno.map((sucursal, index) => (
+              <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-mascotera-darker/50 hover:bg-mascotera-darker transition-colors">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                  index === 0 ? 'bg-yellow-500/20 text-yellow-500' :
+                  index === 1 ? 'bg-gray-400/20 text-gray-400' :
+                  index === 2 ? 'bg-orange-600/20 text-orange-600' :
+                  'bg-mascotera-card text-mascotera-text-muted'
+                }`}>
+                  #{index + 1}
                 </div>
-                <div className="h-2 bg-mascotera-darker rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-mascotera-accent to-mascotera-accent-light rounded-full transition-all duration-500"
-                    style={{ width: `${item.cumplimiento}%` }}
-                  ></div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-mascotera-text">{sucursal.nombre}</span>
+                    {sucursal.pendiente ? (
+                      <span className="text-sm text-mascotera-warning font-semibold">PENDIENTE</span>
+                    ) : (
+                      <span className="text-sm font-semibold text-mascotera-accent">
+                        {sucursal.pilaresCumplidos}/{sucursal.totalPilares} Pilares
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-2 bg-mascotera-card rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        sucursal.pendiente
+                          ? 'bg-mascotera-warning'
+                          : sucursal.cumplimiento >= 80
+                            ? 'bg-gradient-to-r from-mascotera-success to-green-400'
+                            : sucursal.cumplimiento >= 50
+                              ? 'bg-gradient-to-r from-mascotera-accent to-mascotera-accent-light'
+                              : 'bg-gradient-to-r from-mascotera-danger to-red-400'
+                      }`}
+                      style={{ width: `${sucursal.pendiente ? 100 : sucursal.cumplimiento}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -357,24 +302,18 @@ const Dashboard = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Tipo</th>
-                  <th>Área</th>
+                  <th>Sucursal</th>
+                  <th>Provincia</th>
                   <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {recentAudits.map((audit) => {
-                  const TipoIcon = getTipoBadge(audit.tipo).icon;
                   return (
                     <tr key={audit.id}>
                       <td className="font-mono text-sm">{audit.id}</td>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <TipoIcon className={`w-4 h-4 ${getTipoBadge(audit.tipo).color}`} />
-                          {audit.tipo}
-                        </div>
-                      </td>
-                      <td>{audit.area}</td>
+                      <td className="font-semibold">{audit.sucursal}</td>
+                      <td>{audit.provincia}</td>
                       <td>
                         <span className={`badge ${getStatusBadge(audit.estado)}`}>
                           {audit.estado}

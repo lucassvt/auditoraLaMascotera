@@ -24,135 +24,152 @@ const Checklist = () => {
   const [expandedCategory, setExpandedCategory] = useState('operativa');
   const [selectedChecklist, setSelectedChecklist] = useState(null);
 
-  // Plantillas de checklist predefinidas
+  // Plantillas de pilares predefinidas
   const checklistTemplates = {
-    operativa: {
-      nombre: 'Auditoría Operativa',
+    ordenLimpieza: {
+      nombre: 'Orden y Limpieza',
       icon: Building2,
       color: 'text-mascotera-accent',
       bg: 'bg-mascotera-accent/10',
       checklists: [
         {
-          id: 'OP-001',
-          nombre: 'Control de Inventario',
-          items: 15,
-          descripcion: 'Verificación de stock, rotación y almacenamiento',
-          ultimaActualizacion: '10/12/2024'
+          id: 'OL-001',
+          nombre: 'Local en Condiciones Óptimas',
+          items: 2,
+          descripcion: 'Verificación del estado general del local',
+          ultimaActualizacion: '04/02/2026'
         },
         {
-          id: 'OP-002',
-          nombre: 'Procesos de Venta',
-          items: 20,
-          descripcion: 'Evaluación del flujo de ventas y atención al cliente',
-          ultimaActualizacion: '08/12/2024'
-        },
-        {
-          id: 'OP-003',
-          nombre: 'Gestión de Personal',
-          items: 12,
-          descripcion: 'Asistencia, horarios y cumplimiento de tareas',
-          ultimaActualizacion: '05/12/2024'
-        },
-        {
-          id: 'OP-004',
-          nombre: 'Seguridad e Higiene',
-          items: 18,
-          descripcion: 'Normas de seguridad y limpieza del local',
-          ultimaActualizacion: '01/12/2024'
+          id: 'OL-002',
+          nombre: 'Indumentaria de Trabajo Presentable',
+          items: 2,
+          descripcion: 'Control de uniformes y presentación del personal',
+          ultimaActualizacion: '04/02/2026'
         }
       ]
     },
-    financiera: {
-      nombre: 'Auditoría Financiera',
-      icon: DollarSign,
-      color: 'text-mascotera-warning',
-      bg: 'bg-mascotera-warning/10',
-      checklists: [
-        {
-          id: 'FIN-001',
-          nombre: 'Cuentas por Cobrar',
-          items: 10,
-          descripcion: 'Revisión de facturas pendientes y antigüedad',
-          ultimaActualizacion: '12/12/2024'
-        },
-        {
-          id: 'FIN-002',
-          nombre: 'Control de Caja',
-          items: 14,
-          descripcion: 'Arqueo de caja y conciliación diaria',
-          ultimaActualizacion: '11/12/2024'
-        },
-        {
-          id: 'FIN-003',
-          nombre: 'Gastos Operativos',
-          items: 16,
-          descripcion: 'Revisión de gastos, comprobantes y autorizaciones',
-          ultimaActualizacion: '09/12/2024'
-        }
-      ]
-    },
-    calidad: {
-      nombre: 'Auditoría de Calidad',
+    serviciosClub: {
+      nombre: 'Servicios y Club la Mascotera',
       icon: ShieldCheck,
       color: 'text-mascotera-success',
       bg: 'bg-mascotera-success/10',
       checklists: [
         {
-          id: 'CAL-001',
-          nombre: 'Calidad de Productos',
-          items: 22,
-          descripcion: 'Estado de productos, fechas de vencimiento y almacenamiento',
-          ultimaActualizacion: '14/12/2024'
+          id: 'SC-001',
+          nombre: 'Servicio de Veterinaria',
+          items: 1,
+          descripcion: 'Evaluación del servicio veterinario ofrecido',
+          ultimaActualizacion: '04/02/2026'
         },
         {
-          id: 'CAL-002',
-          nombre: 'Satisfacción del Cliente',
-          items: 12,
-          descripcion: 'Encuestas, quejas y tiempo de respuesta',
-          ultimaActualizacion: '13/12/2024'
+          id: 'SC-002',
+          nombre: 'Servicio de Peluquería',
+          items: 1,
+          descripcion: 'Evaluación del servicio de peluquería canina',
+          ultimaActualizacion: '04/02/2026'
         },
         {
-          id: 'CAL-003',
-          nombre: 'Estándares de Servicio',
-          items: 18,
-          descripcion: 'Protocolos de atención y presentación',
-          ultimaActualizacion: '07/12/2024'
+          id: 'SC-003',
+          nombre: 'Pregunta: ¿Suma puntos?',
+          items: 1,
+          descripcion: 'Control si se ofrece el programa de puntos al cliente',
+          ultimaActualizacion: '04/02/2026'
+        },
+        {
+          id: 'SC-004',
+          nombre: 'Facturación a Consumidor Final < 30%',
+          items: 1,
+          descripcion: 'Control del ratio de facturación a consumidor final',
+          ultimaActualizacion: '04/02/2026'
+        }
+      ]
+    },
+    gestionAdministrativa: {
+      nombre: 'Gestión Administrativa y Sistema',
+      icon: FileText,
+      color: 'text-mascotera-warning',
+      bg: 'bg-mascotera-warning/10',
+      checklists: [
+        {
+          id: 'GA-001',
+          nombre: 'Pedidos Pendientes de Facturar',
+          items: 1,
+          descripcion: 'Revisión de pedidos sin facturar en el sistema',
+          ultimaActualizacion: '04/02/2026'
+        },
+        {
+          id: 'GA-002',
+          nombre: 'Carga Correcta de Remitos',
+          items: 1,
+          descripcion: 'Verificación de remitos cargados correctamente',
+          ultimaActualizacion: '04/02/2026'
+        },
+        {
+          id: 'GA-003',
+          nombre: 'Transferencias Pendientes de Aceptar',
+          items: 1,
+          descripcion: 'Control de transferencias pendientes de confirmación',
+          ultimaActualizacion: '04/02/2026'
+        }
+      ]
+    },
+    pedidosYa: {
+      nombre: 'Pedidos Ya / Whatsapp WEB',
+      icon: CheckSquare,
+      color: 'text-mascotera-accent',
+      bg: 'bg-mascotera-accent/10',
+      checklists: [
+        {
+          id: 'PY-001',
+          nombre: 'Tasa de Pedidos Rechazados',
+          items: 1,
+          descripcion: 'Control que la tasa sea menor al 3%',
+          ultimaActualizacion: '04/02/2026'
+        }
+      ]
+    },
+    stockCaja: {
+      nombre: 'Stock y Caja',
+      icon: DollarSign,
+      color: 'text-mascotera-danger',
+      bg: 'bg-mascotera-danger/10',
+      checklists: [
+        {
+          id: 'SC-001',
+          nombre: 'Desviaciones de Stock Valorizadas',
+          items: 1,
+          descripcion: 'Control de ingresos, egresos y ajustes de stock',
+          ultimaActualizacion: '04/02/2026'
+        },
+        {
+          id: 'SC-002',
+          nombre: 'Arqueos y Conciliaciones',
+          items: 1,
+          descripcion: 'Verificación de arqueos de efectivo y tarjetas bancarias',
+          ultimaActualizacion: '04/02/2026'
         }
       ]
     }
   };
 
-  // Ejemplo de checklist detallado
+  // Ejemplo de pilar detallado
   const checklistDetalle = {
-    id: 'OP-001',
-    nombre: 'Control de Inventario',
-    descripcion: 'Verificación completa del sistema de inventario, incluyendo stock físico, rotación y condiciones de almacenamiento.',
+    id: 'OL-001',
+    nombre: 'Orden y Limpieza',
+    descripcion: 'Evaluación de las condiciones del local y la presentación del personal.',
     categorias: [
       {
-        nombre: 'Verificación de Stock',
+        nombre: 'Local en Condiciones Óptimas',
         items: [
-          { id: 1, texto: 'El inventario físico coincide con el sistema', estado: 'pendiente', observacion: '' },
-          { id: 2, texto: 'No hay productos con stock negativo', estado: 'cumple', observacion: '' },
-          { id: 3, texto: 'Los productos de alta rotación están disponibles', estado: 'cumple', observacion: '' },
-          { id: 4, texto: 'Se registran correctamente las entradas de mercadería', estado: 'no_cumple', observacion: 'Falta documentación en 3 ingresos' },
+          { id: 1, texto: 'El local se encuentra limpio y ordenado', estado: 'cumple', observacion: '' },
+          { id: 2, texto: 'Los espacios comunes están libres de obstrucciones', estado: 'cumple', observacion: '' },
         ]
       },
       {
-        nombre: 'Condiciones de Almacenamiento',
+        nombre: 'Indumentaria de Trabajo Presentable',
         items: [
-          { id: 5, texto: 'Temperatura adecuada en áreas refrigeradas', estado: 'cumple', observacion: '' },
-          { id: 6, texto: 'Productos organizados por categoría', estado: 'pendiente', observacion: '' },
-          { id: 7, texto: 'Señalización correcta de pasillos', estado: 'cumple', observacion: '' },
-          { id: 8, texto: 'Limpieza general del almacén', estado: 'cumple', observacion: '' },
-        ]
-      },
-      {
-        nombre: 'Control de Vencimientos',
-        items: [
-          { id: 9, texto: 'Sistema FIFO implementado correctamente', estado: 'pendiente', observacion: '' },
-          { id: 10, texto: 'No hay productos vencidos en exhibición', estado: 'cumple', observacion: '' },
-          { id: 11, texto: 'Alertas de vencimiento configuradas', estado: 'no_cumple', observacion: 'Sistema no tiene alertas activas' },
-          { id: 12, texto: 'Registro de productos dados de baja', estado: 'cumple', observacion: '' },
+          { id: 3, texto: 'El personal usa uniforme completo y en buen estado', estado: 'cumple', observacion: '' },
+          { id: 4, texto: 'La presentación personal es adecuada', estado: 'cumple', observacion: '' },
         ]
       }
     ]
@@ -185,14 +202,14 @@ const Checklist = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="title-yellow text-2xl">Checklist de Control</h1>
+          <h1 className="title-yellow text-2xl">Pilares de Auditoría</h1>
           <p className="text-mascotera-text-muted mt-1">
-            Plantillas y listas de verificación para auditorías
+            Pilares de control y verificación para auditorías
           </p>
         </div>
         <button className="btn-primary flex items-center gap-2">
           <Plus className="w-5 h-5" />
-          Nuevo Checklist
+          Nuevo Pilar
         </button>
       </div>
 
