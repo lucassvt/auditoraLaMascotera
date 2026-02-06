@@ -18,18 +18,152 @@ import {
   Building2,
   Clock,
   ChevronRight,
+  ChevronLeft,
   X,
   Upload,
-  Send
+  Send,
+  ShieldAlert,
+  TrendingDown,
+  Repeat,
+  XCircle
 } from 'lucide-react';
+import { useAudit } from '../context/AuditContext';
 
 const Reportes = () => {
+  const { getAllHallazgos } = useAudit();
   const [filterType, setFilterType] = useState('todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedHallazgo, setSelectedHallazgo] = useState(null);
+  const [nuevoHallazgoModalOpen, setNuevoHallazgoModalOpen] = useState(false);
+  const [nuevoHallazgo, setNuevoHallazgo] = useState({
+    titulo: '',
+    descripcion: '',
+    pilar: '',
+    sucursal: '',
+    tipo: 'no_conformidad',
+    severidad: 'media',
+    fechaLimite: '',
+    imagenes: []
+  });
 
-  // Datos de ejemplo de hallazgos
-  const hallazgos = [
+  const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const [selectedMonth, setSelectedMonth] = useState(0); // Enero
+  const [selectedYear, setSelectedYear] = useState(2026);
+
+  const handlePrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const mesKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+
+  // Datos de hallazgos con campo mes para filtrado
+  const todosLosHallazgosMock = [
+    // Enero 2026
+    {
+      id: 'HAL-2026-001',
+      titulo: 'Desviación de Stock Valorizado - $32,000',
+      descripcion: 'Se detectó una desviación de $32,000 en el inventario valorizado de la sucursal. Ajustes de ingresos y egresos mal registrados durante el mes.',
+      tipo: 'no_conformidad',
+      severidad: 'alta',
+      categoria: 'stock',
+      auditoria: 'AUD-2026-001',
+      area: 'LAPRIDA',
+      auditor: 'María García',
+      fechaDeteccion: '15/01/2026',
+      fechaLimite: '22/01/2026',
+      estado: 'abierto',
+      acciones: 1,
+      comentarios: 2,
+      evidencias: 2,
+      mes: '2026-01'
+    },
+    {
+      id: 'HAL-2026-002',
+      titulo: 'Tasa de Rechazo Pedidos Ya: 6.2%',
+      descripcion: 'La tasa de rechazo de pedidos de Pedidos Ya alcanzó el 6.2%, superando el límite del 3%. Se requiere plan de mejora inmediato.',
+      tipo: 'no_conformidad',
+      severidad: 'alta',
+      categoria: 'pedidos_ya',
+      auditoria: 'AUD-2026-002',
+      area: 'CONGRESO',
+      auditor: 'Carlos López',
+      fechaDeteccion: '12/01/2026',
+      fechaLimite: '19/01/2026',
+      estado: 'en_proceso',
+      acciones: 2,
+      comentarios: 3,
+      evidencias: 1,
+      mes: '2026-01'
+    },
+    {
+      id: 'HAL-2026-003',
+      titulo: 'Deficiencias en Orden y Limpieza',
+      descripcion: 'Se observaron áreas de depósito desordenadas y productos vencidos sin retirar de góndolas. Falta de cumplimiento del protocolo de limpieza diaria.',
+      tipo: 'no_conformidad',
+      severidad: 'alta',
+      categoria: 'orden_limpieza',
+      auditoria: 'AUD-2026-003',
+      area: 'BELGRANO SUR',
+      auditor: 'Roberto Díaz',
+      fechaDeteccion: '18/01/2026',
+      fechaLimite: '25/01/2026',
+      estado: 'abierto',
+      acciones: 3,
+      comentarios: 1,
+      evidencias: 5,
+      mes: '2026-01'
+    },
+    {
+      id: 'HAL-2026-004',
+      titulo: 'Arqueo de Caja - Diferencia $8,900',
+      descripcion: 'Diferencia de $8,900 sin justificar en el arqueo semanal. No se realizaron conciliaciones diarias.',
+      tipo: 'no_conformidad',
+      severidad: 'alta',
+      categoria: 'caja',
+      auditoria: 'AUD-2026-004',
+      area: 'CONGRESO',
+      auditor: 'Ana Martínez',
+      fechaDeteccion: '20/01/2026',
+      fechaLimite: '27/01/2026',
+      estado: 'abierto',
+      acciones: 1,
+      comentarios: 4,
+      evidencias: 2,
+      mes: '2026-01'
+    },
+    {
+      id: 'HAL-2026-005',
+      titulo: 'Buena Práctica: Excelente gestión de stock',
+      descripcion: 'La sucursal Leguizamón mantiene una gestión de stock ejemplar con desviación cercana a cero durante todo el mes.',
+      tipo: 'buena_practica',
+      severidad: 'positivo',
+      categoria: 'stock',
+      auditoria: 'AUD-2026-005',
+      area: 'LEGUIZAMON',
+      auditor: 'María García',
+      fechaDeteccion: '25/01/2026',
+      fechaLimite: '',
+      estado: 'cerrado',
+      acciones: 0,
+      comentarios: 2,
+      evidencias: 1,
+      mes: '2026-01'
+    },
+    // Diciembre 2025
     {
       id: 'HAL-2024-001',
       titulo: 'Ajuste de Stock Crítico - Desviación $45,000',
@@ -40,13 +174,13 @@ const Reportes = () => {
       auditoria: 'AUD-2024-001',
       area: 'BELGRANO SUR',
       auditor: 'María García',
-      fechaDeteccion: '16/12/2024',
-      fechaLimite: '23/12/2024',
+      fechaDeteccion: '16/12/2025',
+      fechaLimite: '23/12/2025',
       estado: 'abierto',
       acciones: 2,
       comentarios: 3,
       evidencias: 2,
-      monto: 45000
+      mes: '2025-12'
     },
     {
       id: 'HAL-2024-002',
@@ -58,66 +192,67 @@ const Reportes = () => {
       auditoria: 'AUD-2024-002',
       area: 'ARENALES',
       auditor: 'Carlos López',
-      fechaDeteccion: '14/12/2024',
-      fechaLimite: '21/12/2024',
+      fechaDeteccion: '14/12/2025',
+      fechaLimite: '21/12/2025',
       estado: 'abierto',
       acciones: 1,
       comentarios: 5,
       evidencias: 3,
-      tasa: 8.5
+      mes: '2025-12'
     },
     {
       id: 'HAL-2024-003',
       titulo: 'Facturación a Consumidor Final: 42%',
-      descripcion: 'La facturación a consumidor final representa el 42% del total de ventas, superando ampliamente el límite del 30%. Esto indica falta de cumplimiento en la consulta de CUIT/DNI para facturación.',
+      descripcion: 'La facturación a consumidor final representa el 42% del total de ventas, superando ampliamente el límite del 30%.',
       tipo: 'no_conformidad',
       severidad: 'alta',
       categoria: 'facturacion',
       auditoria: 'AUD-2024-003',
       area: 'LAPRIDA',
       auditor: 'Ana Martínez',
-      fechaDeteccion: '13/12/2024',
-      fechaLimite: '27/12/2024',
+      fechaDeteccion: '13/12/2025',
+      fechaLimite: '27/12/2025',
       estado: 'en_proceso',
       acciones: 2,
       comentarios: 4,
       evidencias: 1,
-      porcentaje: 42
+      mes: '2025-12'
     },
     {
       id: 'HAL-2024-004',
       titulo: 'Local con Deficiente Orden y Limpieza',
-      descripcion: 'El local presenta graves deficiencias en orden y limpieza: pisos sucios, productos mal ubicados, áreas de depósito desordenadas y falta de mantenimiento general. Se adjuntan fotos como evidencia.',
+      descripcion: 'El local presenta graves deficiencias en orden y limpieza: pisos sucios, productos mal ubicados, áreas de depósito desordenadas y falta de mantenimiento general.',
       tipo: 'no_conformidad',
       severidad: 'alta',
       categoria: 'orden_limpieza',
       auditoria: 'AUD-2024-004',
       area: 'BELGRANO SUR',
       auditor: 'Roberto Díaz',
-      fechaDeteccion: '15/12/2024',
-      fechaLimite: '20/12/2024',
+      fechaDeteccion: '15/12/2025',
+      fechaLimite: '20/12/2025',
       estado: 'abierto',
       acciones: 3,
       comentarios: 2,
       evidencias: 8,
-      tieneImagenes: true
+      mes: '2025-12'
     },
     {
       id: 'HAL-2024-005',
       titulo: 'Falta de Consulta de Programa de Puntos',
-      descripcion: 'Los vendedores no están consultando al cliente si desea sumar puntos en el programa La Mascotera. Esto reduce la participación en el programa de fidelización.',
-      tipo: 'no_conformidad',
+      descripcion: 'Los vendedores no están consultando al cliente si desea sumar puntos en el programa La Mascotera.',
+      tipo: 'observacion',
       severidad: 'media',
       categoria: 'servicio_cliente',
       auditoria: 'AUD-2024-005',
       area: 'ARENALES',
       auditor: 'Juan Pérez',
-      fechaDeteccion: '12/12/2024',
-      fechaLimite: '26/12/2024',
+      fechaDeteccion: '12/12/2025',
+      fechaLimite: '26/12/2025',
       estado: 'en_proceso',
       acciones: 1,
       comentarios: 3,
-      evidencias: 0
+      evidencias: 0,
+      mes: '2025-12'
     },
     {
       id: 'HAL-2024-006',
@@ -129,12 +264,13 @@ const Reportes = () => {
       auditoria: 'AUD-2024-006',
       area: 'LAPRIDA',
       auditor: 'María García',
-      fechaDeteccion: '11/12/2024',
-      fechaLimite: '18/12/2024',
+      fechaDeteccion: '11/12/2025',
+      fechaLimite: '18/12/2025',
       estado: 'abierto',
       acciones: 1,
       comentarios: 2,
-      evidencias: 2
+      evidencias: 2,
+      mes: '2025-12'
     },
     {
       id: 'HAL-2024-007',
@@ -146,32 +282,109 @@ const Reportes = () => {
       auditoria: 'AUD-2024-007',
       area: 'CONGRESO',
       auditor: 'Carlos López',
-      fechaDeteccion: '10/12/2024',
-      fechaLimite: '17/12/2024',
+      fechaDeteccion: '10/12/2025',
+      fechaLimite: '17/12/2025',
       estado: 'abierto',
       acciones: 2,
       comentarios: 6,
       evidencias: 3,
-      monto: 12500
+      mes: '2025-12'
     },
     {
       id: 'HAL-2024-008',
       titulo: 'Acción Grave: Personal sin Capacitación en POS',
-      descripcion: 'Se detectó que el personal nuevo no recibió la capacitación obligatoria sobre el uso del sistema POS y procedimientos de caja. Esto representa un riesgo operativo crítico.',
+      descripcion: 'Se detectó que el personal nuevo no recibió la capacitación obligatoria sobre el uso del sistema POS y procedimientos de caja.',
       tipo: 'no_conformidad',
       severidad: 'alta',
       categoria: 'accion_grave',
       auditoria: 'AUD-2024-008',
       area: 'CATAMARCA',
       auditor: 'Ana Martínez',
-      fechaDeteccion: '09/12/2024',
-      fechaLimite: '16/12/2024',
+      fechaDeteccion: '09/12/2025',
+      fechaLimite: '16/12/2025',
       estado: 'en_proceso',
       acciones: 2,
       comentarios: 1,
-      evidencias: 1
+      evidencias: 1,
+      mes: '2025-12'
     },
+    // Noviembre 2025
+    {
+      id: 'HAL-2025-N01',
+      titulo: 'Falta de Control de Temperatura en Depósito',
+      descripcion: 'No se registran controles de temperatura en el depósito de productos sensibles. Se requiere implementar registro diario obligatorio.',
+      tipo: 'no_conformidad',
+      severidad: 'alta',
+      categoria: 'orden_limpieza',
+      auditoria: 'AUD-2025-N01',
+      area: 'DEPOSITO RUTA 9',
+      auditor: 'Roberto Díaz',
+      fechaDeteccion: '05/11/2025',
+      fechaLimite: '15/11/2025',
+      estado: 'cerrado',
+      acciones: 2,
+      comentarios: 4,
+      evidencias: 3,
+      mes: '2025-11'
+    },
+    {
+      id: 'HAL-2025-N02',
+      titulo: 'Desviación de Stock - $18,500',
+      descripcion: 'Desviación de $18,500 detectada en el conteo mensual. Principalmente en la categoría de alimentos premium.',
+      tipo: 'no_conformidad',
+      severidad: 'alta',
+      categoria: 'stock',
+      auditoria: 'AUD-2025-N02',
+      area: 'ARENALES',
+      auditor: 'María García',
+      fechaDeteccion: '10/11/2025',
+      fechaLimite: '20/11/2025',
+      estado: 'cerrado',
+      acciones: 3,
+      comentarios: 5,
+      evidencias: 2,
+      mes: '2025-11'
+    },
+    {
+      id: 'HAL-2025-N03',
+      titulo: 'Incumplimiento en Horario de Apertura',
+      descripcion: 'La sucursal abrió tarde en 4 ocasiones durante el mes, afectando las ventas de la primera hora.',
+      tipo: 'observacion',
+      severidad: 'media',
+      categoria: 'gestion_admin',
+      auditoria: 'AUD-2025-N03',
+      area: 'VILLA CRESPO',
+      auditor: 'Carlos López',
+      fechaDeteccion: '15/11/2025',
+      fechaLimite: '25/11/2025',
+      estado: 'cerrado',
+      acciones: 1,
+      comentarios: 2,
+      evidencias: 1,
+      mes: '2025-11'
+    },
+    {
+      id: 'HAL-2025-N04',
+      titulo: 'Buena Práctica: Programa de Fidelización Exitoso',
+      descripcion: 'Catamarca logró un 95% de consulta del programa de puntos, superando ampliamente el objetivo del 80%.',
+      tipo: 'buena_practica',
+      severidad: 'positivo',
+      categoria: 'servicio_cliente',
+      auditoria: 'AUD-2025-N04',
+      area: 'CATAMARCA',
+      auditor: 'Ana Martínez',
+      fechaDeteccion: '20/11/2025',
+      fechaLimite: '',
+      estado: 'cerrado',
+      acciones: 0,
+      comentarios: 3,
+      evidencias: 1,
+      mes: '2025-11'
+    }
   ];
+
+  // Filtrar hallazgos por mes seleccionado
+  const hallazgos = todosLosHallazgosMock.filter(h => h.mes === mesKey);
 
   const tipoConfig = {
     'no_conformidad': { label: 'No Conformidad', icon: AlertTriangle, color: 'text-mascotera-danger', bg: 'bg-mascotera-danger/10' },
@@ -180,6 +393,7 @@ const Reportes = () => {
   };
 
   const severidadConfig = {
+    'critica': { label: 'Crítica', color: 'text-red-500', bg: 'bg-red-500/20' },
     'alta': { label: 'Alta', color: 'text-mascotera-danger', bg: 'bg-mascotera-danger/20' },
     'media': { label: 'Media', color: 'text-mascotera-warning', bg: 'bg-mascotera-warning/20' },
     'baja': { label: 'Baja', color: 'text-mascotera-info', bg: 'bg-mascotera-info/20' },
@@ -192,22 +406,231 @@ const Reportes = () => {
     'cerrado': { label: 'Cerrado', badge: 'badge-success' }
   };
 
+  // Mapear criticidad de auditoría a severidad de reportes
+  const criticidadToSeveridad = {
+    'baja': 'baja',
+    'media': 'media',
+    'alta': 'alta',
+    'critica': 'critica'
+  };
+
+  // Obtener hallazgos de auditorías
+  const auditHallazgos = getAllHallazgos().map(h => ({
+    id: h.id,
+    titulo: `${h.pilar} - Hallazgo de Auditoría`,
+    descripcion: h.observaciones || 'No se proporcionaron observaciones adicionales',
+    tipo: 'no_conformidad',
+    severidad: criticidadToSeveridad[h.criticidad],
+    categoria: 'auditoria',
+    auditoria: `AUD-${new Date(h.fecha).getFullYear()}-${h.sucursal}`,
+    area: h.sucursal,
+    auditor: 'Sistema de Auditoría',
+    fechaDeteccion: new Date(h.fecha).toLocaleDateString('es-AR'),
+    fechaLimite: new Date(new Date(h.fecha).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('es-AR'),
+    estado: h.estado,
+    acciones: 0,
+    comentarios: 0,
+    evidencias: h.imagenes?.length || 0,
+    tieneImagenes: (h.imagenes?.length || 0) > 0,
+    criticidadOriginal: h.criticidad
+  }));
+
+  // Combinar hallazgos manuales con hallazgos de auditoría
+  const todosHallazgos = [...hallazgos, ...auditHallazgos];
+
   const filteredHallazgos = filterType === 'todos'
-    ? hallazgos
-    : hallazgos.filter(h => h.tipo === filterType);
+    ? todosHallazgos
+    : todosHallazgos.filter(h => h.tipo === filterType);
 
   const stats = [
-    { label: 'Total Hallazgos', value: hallazgos.length, color: 'text-mascotera-text' },
-    { label: 'Hallazgos Críticos', value: hallazgos.filter(h => h.severidad === 'alta').length, color: 'text-mascotera-danger' },
-    { label: 'Orden y Limpieza', value: hallazgos.filter(h => h.categoria === 'orden_limpieza').length, color: 'text-mascotera-warning' },
-    { label: 'Stock y Caja', value: hallazgos.filter(h => h.categoria === 'stock' || h.categoria === 'caja').length, color: 'text-mascotera-accent' },
-    { label: 'Pedidos Ya', value: hallazgos.filter(h => h.categoria === 'pedidos_ya').length, color: 'text-mascotera-info' },
-    { label: 'Acciones Graves', value: hallazgos.filter(h => h.categoria === 'accion_grave').length, color: 'text-mascotera-danger' },
+    { label: 'Total Hallazgos', value: todosHallazgos.length, color: 'text-mascotera-text' },
+    { label: 'Hallazgos Críticos', value: todosHallazgos.filter(h => h.severidad === 'alta').length, color: 'text-mascotera-danger' },
+    { label: 'De Auditorías', value: auditHallazgos.length, color: 'text-mascotera-accent' },
+    { label: 'Orden y Limpieza', value: todosHallazgos.filter(h => h.categoria === 'orden_limpieza').length, color: 'text-mascotera-warning' },
+    { label: 'Stock y Caja', value: todosHallazgos.filter(h => h.categoria === 'stock' || h.categoria === 'caja').length, color: 'text-mascotera-accent' },
+    { label: 'Acciones Graves', value: todosHallazgos.filter(h => h.categoria === 'accion_grave').length, color: 'text-mascotera-danger' },
   ];
 
   const openDetail = (hallazgo) => {
     setSelectedHallazgo(hallazgo);
     setModalOpen(true);
+  };
+
+  // --- Datos históricos para detección de patrones negativos ---
+  const pilaresNombres = {
+    ordenLimpieza: 'Orden y Limpieza',
+    serviciosClub: 'Servicios y Club',
+    gestionAdministrativa: 'Gestión Administrativa',
+    pedidosYa: 'Pedidos Ya / WhatsApp',
+    stockCaja: 'Stock y Caja',
+    gestionPedidos: 'Gestión de Pedidos',
+    mantenimientoVehiculos: 'Mant. Vehículos'
+  };
+
+  const historicoPatrones = {
+    'LEGUIZAMON': {
+      ordenLimpieza: [true, true, true, true, true, true],
+      serviciosClub: [true, true, false, false, true, true],
+      gestionAdministrativa: [true, true, true, true, true, true],
+      pedidosYa: [true, false, true, true, true, true],
+      stockCaja: [false, true, true, false, false, true]
+    },
+    'CATAMARCA': {
+      ordenLimpieza: [true, true, true, true, true, true],
+      serviciosClub: [true, true, true, true, true, true],
+      gestionAdministrativa: [false, true, true, true, true, true],
+      pedidosYa: [true, true, false, false, true, true],
+      stockCaja: [true, true, true, true, true, true]
+    },
+    'CONGRESO': {
+      ordenLimpieza: [false, true, false, false, true, true],
+      serviciosClub: [true, true, true, true, false, true],
+      gestionAdministrativa: [true, false, true, false, true, true],
+      pedidosYa: [true, true, true, true, true, true],
+      stockCaja: [false, false, false, false, false, false]
+    },
+    'ARENALES': {
+      ordenLimpieza: [true, true, true, true, false, true],
+      serviciosClub: [false, false, false, true, true, false],
+      gestionAdministrativa: [true, true, true, true, true, true],
+      pedidosYa: [false, false, true, true, false, false],
+      stockCaja: [true, true, false, false, true, true]
+    },
+    'BELGRANO SUR': {
+      ordenLimpieza: [false, false, false, false, false, false],
+      serviciosClub: [false, true, false, false, true, true],
+      gestionAdministrativa: [true, false, true, true, false, true],
+      pedidosYa: [true, true, true, true, true, true],
+      stockCaja: [false, false, false, false, false, false]
+    },
+    'LAPRIDA': {
+      ordenLimpieza: [false, false, false, false, false, false],
+      serviciosClub: [false, false, false, false, false, true],
+      gestionAdministrativa: [false, false, true, false, false, false],
+      pedidosYa: [true, false, false, false, true, true],
+      stockCaja: [false, false, false, false, false, false]
+    },
+    'VILLA CRESPO': {
+      ordenLimpieza: [true, true, true, true, null, null],
+      serviciosClub: [true, true, false, true, null, null],
+      gestionAdministrativa: [true, true, true, true, null, null],
+      pedidosYa: [true, true, true, true, null, null],
+      stockCaja: [false, true, true, false, null, null]
+    },
+    'DEPOSITO RUTA 9': {
+      ordenLimpieza: [true, true, true, true, true, true],
+      gestionAdministrativa: [true, true, true, true, true, true],
+      stockCaja: [true, false, true, true, false, true],
+      gestionPedidos: [true, true, true, true, true, true],
+      mantenimientoVehiculos: [true, true, false, true, true, true]
+    }
+  };
+
+  const analizarPatron = (resultados) => {
+    const evaluados = resultados.filter(r => r !== null);
+    if (evaluados.length === 0) return { tipo: 'sin_datos', label: 'Sin datos' };
+    const aprobados = evaluados.filter(r => r === true).length;
+    const total = evaluados.length;
+    const ratio = aprobados / total;
+    const ultimos = evaluados.slice(-3);
+    const todosUltimosDesaprobados = ultimos.every(r => r === false);
+    if (ratio === 0) return { tipo: 'siempre_desaprueba', label: 'Siempre desaprueba' };
+    const mitad = Math.floor(evaluados.length / 2);
+    const primeraMitad = mitad > 0 ? evaluados.slice(0, mitad).filter(r => r === true).length / mitad : 0;
+    const segundaMitad = evaluados.slice(mitad).length > 0 ? evaluados.slice(mitad).filter(r => r === true).length / evaluados.slice(mitad).length : 0;
+    if (segundaMitad < primeraMitad && todosUltimosDesaprobados) return { tipo: 'empeorando', label: 'Empeorando' };
+    if (ratio < 0.5) return { tipo: 'irregular', label: 'Irregular negativo' };
+    return null; // no es patrón negativo
+  };
+
+  // Generar alertas de patrones negativos por sucursal
+  const alertasPatrones = [];
+  Object.entries(historicoPatrones).forEach(([sucursal, pilaresData]) => {
+    Object.entries(pilaresData).forEach(([pilarKey, resultados]) => {
+      const patron = analizarPatron(resultados);
+      if (patron) {
+        const desaprobados = resultados.filter(r => r === false).length;
+        const evaluados = resultados.filter(r => r !== null).length;
+        alertasPatrones.push({
+          sucursal,
+          pilar: pilaresNombres[pilarKey] || pilarKey,
+          patron,
+          desaprobados,
+          evaluados,
+          ultimos3: resultados.slice(-3)
+        });
+      }
+    });
+  });
+
+  // Ordenar: siempre_desaprueba > empeorando > irregular
+  const patronOrden = { siempre_desaprueba: 0, empeorando: 1, irregular: 2 };
+  alertasPatrones.sort((a, b) => (patronOrden[a.patron.tipo] ?? 9) - (patronOrden[b.patron.tipo] ?? 9));
+
+  // Datos de pilares y sucursales
+  const pilares = [
+    { key: 'ordenLimpieza', nombre: 'Orden y Limpieza' },
+    { key: 'serviciosClub', nombre: 'Servicios y Club la Mascotera' },
+    { key: 'gestionAdministrativa', nombre: 'Gestión Administrativa y Sistema' },
+    { key: 'pedidosYa', nombre: 'Pedidos Ya / Whatsapp WEB' },
+    { key: 'stockCaja', nombre: 'Stock y Caja' },
+    { key: 'gestionPedidos', nombre: 'Gestión de Pedidos' },
+    { key: 'mantenimientoVehiculos', nombre: 'Mantenimiento de Vehículos' }
+  ];
+
+  const sucursales = [
+    'LEGUIZAMON',
+    'CATAMARCA',
+    'CONGRESO',
+    'ARENALES',
+    'BELGRANO SUR',
+    'LAPRIDA',
+    'VILLA CRESPO',
+    'DEPOSITO RUTA 9'
+  ];
+
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    const imageFiles = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      name: file.name
+    }));
+    setNuevoHallazgo({
+      ...nuevoHallazgo,
+      imagenes: [...nuevoHallazgo.imagenes, ...imageFiles]
+    });
+  };
+
+  const handleRemoveImage = (index) => {
+    const newImagenes = [...nuevoHallazgo.imagenes];
+    // Liberar la URL del objeto para evitar fugas de memoria
+    URL.revokeObjectURL(newImagenes[index].preview);
+    newImagenes.splice(index, 1);
+    setNuevoHallazgo({
+      ...nuevoHallazgo,
+      imagenes: newImagenes
+    });
+  };
+
+  const handleNuevoHallazgoSubmit = (e) => {
+    e.preventDefault();
+    // Aquí se agregaría la lógica para guardar el hallazgo
+    console.log('Nuevo hallazgo:', nuevoHallazgo);
+    setNuevoHallazgoModalOpen(false);
+    // Limpiar URLs de objetos para evitar fugas de memoria
+    nuevoHallazgo.imagenes.forEach(img => URL.revokeObjectURL(img.preview));
+    // Resetear formulario
+    setNuevoHallazgo({
+      titulo: '',
+      descripcion: '',
+      pilar: '',
+      sucursal: '',
+      tipo: 'no_conformidad',
+      severidad: 'media',
+      fechaLimite: '',
+      imagenes: []
+    });
   };
 
   return (
@@ -220,12 +643,25 @@ const Reportes = () => {
             Gestión de hallazgos, no conformidades y observaciones
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={handlePrevMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2 px-4 py-2 bg-mascotera-darker rounded-lg min-w-[180px] justify-center">
+            <Calendar className="w-4 h-4 text-mascotera-accent" />
+            <span className="font-semibold text-mascotera-text">{mesesNombres[selectedMonth]} {selectedYear}</span>
+          </div>
+          <button onClick={handleNextMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
+            <ChevronRight className="w-5 h-5" />
+          </button>
           <button className="btn-secondary flex items-center gap-2">
             <Download className="w-4 h-4" />
             Exportar Reporte
           </button>
-          <button className="btn-primary flex items-center gap-2">
+          <button
+            onClick={() => setNuevoHallazgoModalOpen(true)}
+            className="btn-primary flex items-center gap-2"
+          >
             <Plus className="w-5 h-5" />
             Nuevo Hallazgo
           </button>
@@ -241,6 +677,69 @@ const Reportes = () => {
           </div>
         ))}
       </div>
+
+      {/* Alertas de Patrones Negativos */}
+      {alertasPatrones.length > 0 && (
+        <div className="card-mascotera">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldAlert className="w-5 h-5 text-mascotera-danger" />
+            <h3 className="text-lg font-semibold text-mascotera-text">Alertas de Patrones Negativos</h3>
+            <span className="text-xs text-mascotera-text-muted ml-2">Últimos 6 meses</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {alertasPatrones.map((alerta, idx) => (
+              <div
+                key={idx}
+                className={`p-4 rounded-lg border-l-4 bg-mascotera-darker ${
+                  alerta.patron.tipo === 'siempre_desaprueba' ? 'border-red-500' :
+                  alerta.patron.tipo === 'empeorando' ? 'border-mascotera-danger' :
+                  'border-mascotera-warning'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <p className="font-semibold text-mascotera-text text-sm">{alerta.sucursal}</p>
+                    <p className="text-xs text-mascotera-text-muted">{alerta.pilar}</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1 ${
+                    alerta.patron.tipo === 'siempre_desaprueba' ? 'bg-red-500/20 text-red-500' :
+                    alerta.patron.tipo === 'empeorando' ? 'bg-mascotera-danger/20 text-mascotera-danger' :
+                    'bg-mascotera-warning/20 text-mascotera-warning'
+                  }`}>
+                    {alerta.patron.tipo === 'siempre_desaprueba' && <XCircle className="w-3 h-3" />}
+                    {alerta.patron.tipo === 'empeorando' && <TrendingDown className="w-3 h-3" />}
+                    {alerta.patron.tipo === 'irregular' && <Repeat className="w-3 h-3" />}
+                    {alerta.patron.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className="text-xs text-mascotera-text-muted mr-1">Últimos 3:</span>
+                  {alerta.ultimos3.map((r, i) => (
+                    <div
+                      key={i}
+                      className={`w-5 h-5 rounded flex items-center justify-center ${
+                        r === null ? 'bg-mascotera-card' :
+                        r ? 'bg-mascotera-success/20' : 'bg-mascotera-danger/20'
+                      }`}
+                    >
+                      {r === null ? (
+                        <span className="text-mascotera-text-muted text-xs">-</span>
+                      ) : r ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-mascotera-success" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-mascotera-danger" />
+                      )}
+                    </div>
+                  ))}
+                  <span className="text-xs text-mascotera-text-muted ml-auto">
+                    {alerta.desaprobados}/{alerta.evaluados} desaprobados
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="card-mascotera">
@@ -330,6 +829,16 @@ const Reportes = () => {
                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${severidadConfig[hallazgo.severidad].bg} ${severidadConfig[hallazgo.severidad].color}`}>
                           {severidadConfig[hallazgo.severidad].label}
                         </span>
+                        {hallazgo.criticidadOriginal === 'critica' && (
+                          <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-500 border border-red-500 animate-pulse">
+                            CRÍTICO
+                          </span>
+                        )}
+                        {hallazgo.categoria === 'auditoria' && (
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-mascotera-accent/20 text-mascotera-accent">
+                            Auditoría
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-semibold text-mascotera-text mt-2">{hallazgo.titulo}</h3>
                       <p className="text-sm text-mascotera-text-muted mt-1 line-clamp-2">
@@ -513,6 +1022,215 @@ const Reportes = () => {
                 Editar Hallazgo
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nuevo Hallazgo */}
+      {nuevoHallazgoModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-mascotera-card rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-mascotera-darker p-6 border-b border-mascotera-border flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-mascotera-text">Nuevo Hallazgo</h2>
+                <p className="text-sm text-mascotera-text-muted mt-1">
+                  Registrar un nuevo hallazgo vinculado a un pilar
+                </p>
+              </div>
+              <button
+                onClick={() => setNuevoHallazgoModalOpen(false)}
+                className="p-2 hover:bg-mascotera-card rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-mascotera-text" />
+              </button>
+            </div>
+
+            <form onSubmit={handleNuevoHallazgoSubmit} className="p-6 space-y-6">
+              {/* Título */}
+              <div>
+                <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                  Título del Hallazgo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={nuevoHallazgo.titulo}
+                  onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, titulo: e.target.value })}
+                  placeholder="Ej: Desviación en arqueo de caja"
+                  className="input-mascotera w-full"
+                />
+              </div>
+
+              {/* Descripción */}
+              <div>
+                <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                  Descripción *
+                </label>
+                <textarea
+                  required
+                  value={nuevoHallazgo.descripcion}
+                  onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, descripcion: e.target.value })}
+                  placeholder="Describe el hallazgo en detalle..."
+                  rows={4}
+                  className="input-mascotera w-full resize-none"
+                />
+              </div>
+
+              {/* Pilar y Sucursal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                    Pilar *
+                  </label>
+                  <select
+                    required
+                    value={nuevoHallazgo.pilar}
+                    onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, pilar: e.target.value })}
+                    className="input-mascotera w-full"
+                  >
+                    <option value="">Seleccionar pilar</option>
+                    {pilares.map((pilar) => (
+                      <option key={pilar.key} value={pilar.key}>
+                        {pilar.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                    Sucursal *
+                  </label>
+                  <select
+                    required
+                    value={nuevoHallazgo.sucursal}
+                    onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, sucursal: e.target.value })}
+                    className="input-mascotera w-full"
+                  >
+                    <option value="">Seleccionar sucursal</option>
+                    {sucursales.map((sucursal) => (
+                      <option key={sucursal} value={sucursal}>
+                        {sucursal}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Tipo y Severidad */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                    Tipo de Hallazgo *
+                  </label>
+                  <select
+                    required
+                    value={nuevoHallazgo.tipo}
+                    onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, tipo: e.target.value })}
+                    className="input-mascotera w-full"
+                  >
+                    <option value="no_conformidad">No Conformidad</option>
+                    <option value="observacion">Observación</option>
+                    <option value="buena_practica">Buena Práctica</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                    Severidad *
+                  </label>
+                  <select
+                    required
+                    value={nuevoHallazgo.severidad}
+                    onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, severidad: e.target.value })}
+                    className="input-mascotera w-full"
+                  >
+                    <option value="alta">Alta</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                    <option value="positivo">Positivo</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fecha Límite */}
+              <div>
+                <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                  Fecha Límite de Resolución
+                </label>
+                <input
+                  type="date"
+                  value={nuevoHallazgo.fechaLimite}
+                  onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, fechaLimite: e.target.value })}
+                  className="input-mascotera w-full"
+                />
+              </div>
+
+              {/* Adjuntar Imágenes */}
+              <div>
+                <label className="block text-sm font-semibold text-mascotera-text mb-2">
+                  Adjuntar Imágenes
+                </label>
+                <div className="space-y-4">
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    <div className="border-2 border-dashed border-mascotera-border hover:border-mascotera-accent rounded-lg p-6 transition-colors flex flex-col items-center justify-center gap-2">
+                      <Upload className="w-8 h-8 text-mascotera-text-muted" />
+                      <p className="text-sm text-mascotera-text">
+                        <span className="text-mascotera-accent font-semibold">Haz clic para subir</span> o arrastra imágenes
+                      </p>
+                      <p className="text-xs text-mascotera-text-muted">PNG, JPG, JPEG hasta 10MB</p>
+                    </div>
+                  </label>
+
+                  {/* Preview de imágenes */}
+                  {nuevoHallazgo.imagenes.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {nuevoHallazgo.imagenes.map((imagen, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={imagen.preview}
+                            alt={imagen.name}
+                            className="w-full h-32 object-cover rounded-lg border border-mascotera-border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute top-2 right-2 p-1.5 bg-mascotera-danger rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-4 h-4 text-white" />
+                          </button>
+                          <p className="text-xs text-mascotera-text-muted mt-1 truncate" title={imagen.name}>
+                            {imagen.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Botones */}
+              <div className="flex items-center justify-end gap-4 pt-4 border-t border-mascotera-border">
+                <button
+                  type="button"
+                  onClick={() => setNuevoHallazgoModalOpen(false)}
+                  className="btn-secondary"
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  Crear Hallazgo
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

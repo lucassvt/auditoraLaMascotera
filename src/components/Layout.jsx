@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   FileSearch,
   FileText,
+  Building2,
   ChevronLeft,
   ChevronRight,
   Bell,
@@ -42,6 +43,12 @@ const Layout = ({ children }) => {
       icon: FileText,
       label: 'Reportes',
       description: 'Hallazgos e informes'
+    },
+    {
+      path: '/sucursales',
+      icon: Building2,
+      label: 'Sucursales',
+      description: 'Histórico y patrones'
     },
   ];
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ClipboardCheck,
   AlertTriangle,
@@ -9,7 +9,10 @@ import {
   DollarSign,
   ShieldCheck,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   AreaChart,
@@ -26,25 +29,113 @@ import {
   Bar,
   Legend
 } from 'recharts';
+import { useAudit } from '../context/AuditContext';
 
 const Dashboard = () => {
-  // Datos de desempeño por sucursal (pilares cumplidos de 5)
-  const sucursalesDesempeno = [
-    { nombre: 'LEGUIZAMON', pilaresCumplidos: 5, totalPilares: 5, cumplimiento: 100 },
-    { nombre: 'CATAMARCA', pilaresCumplidos: 5, totalPilares: 5, cumplimiento: 100 },
-    { nombre: 'CONGRESO', pilaresCumplidos: 4, totalPilares: 5, cumplimiento: 80 },
-    { nombre: 'ARENALES', pilaresCumplidos: 3, totalPilares: 5, cumplimiento: 60 },
-    { nombre: 'BELGRANO SUR', pilaresCumplidos: 3, totalPilares: 5, cumplimiento: 60 },
-    { nombre: 'LAPRIDA', pilaresCumplidos: 2, totalPilares: 5, cumplimiento: 40 },
-    { nombre: 'VILLA CRESPO', pilaresCumplidos: 0, totalPilares: 5, cumplimiento: 0, pendiente: true },
-  ].sort((a, b) => b.cumplimiento - a.cumplimiento);
+  const { auditData, getAllHallazgos } = useAudit();
+
+  const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const [selectedMonth, setSelectedMonth] = useState(0); // Enero
+  const [selectedYear, setSelectedYear] = useState(2026);
+
+  const handlePrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const mesKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+
+  // Lista de sucursales
+  const sucursalesList = [
+    'LEGUIZAMON',
+    'CATAMARCA',
+    'CONGRESO',
+    'ARENALES',
+    'BELGRANO SUR',
+    'LAPRIDA',
+    'VILLA CRESPO',
+    'DEPOSITO RUTA 9'
+  ];
+
+  // Datos históricos mock por mes
+  const datosHistoricos = {
+    '2025-11': {
+      'LEGUIZAMON': { cumplimiento: 60, pilaresCumplidos: 3, totalPilares: 5, pendiente: false },
+      'CATAMARCA': { cumplimiento: 80, pilaresCumplidos: 4, totalPilares: 5, pendiente: false },
+      'CONGRESO': { cumplimiento: 40, pilaresCumplidos: 2, totalPilares: 5, pendiente: false },
+      'ARENALES': { cumplimiento: 60, pilaresCumplidos: 3, totalPilares: 5, pendiente: false },
+      'BELGRANO SUR': { cumplimiento: 20, pilaresCumplidos: 1, totalPilares: 5, pendiente: false },
+      'LAPRIDA': { cumplimiento: 0, pilaresCumplidos: 0, totalPilares: 5, pendiente: true },
+      'VILLA CRESPO': { cumplimiento: 80, pilaresCumplidos: 4, totalPilares: 5, pendiente: false },
+      'DEPOSITO RUTA 9': { cumplimiento: 100, pilaresCumplidos: 5, totalPilares: 5, pendiente: false }
+    },
+    '2025-12': {
+      'LEGUIZAMON': { cumplimiento: 80, pilaresCumplidos: 4, totalPilares: 5, pendiente: false },
+      'CATAMARCA': { cumplimiento: 100, pilaresCumplidos: 5, totalPilares: 5, pendiente: false },
+      'CONGRESO': { cumplimiento: 60, pilaresCumplidos: 3, totalPilares: 5, pendiente: false },
+      'ARENALES': { cumplimiento: 40, pilaresCumplidos: 2, totalPilares: 5, pendiente: false },
+      'BELGRANO SUR': { cumplimiento: 40, pilaresCumplidos: 2, totalPilares: 5, pendiente: false },
+      'LAPRIDA': { cumplimiento: 20, pilaresCumplidos: 1, totalPilares: 5, pendiente: false },
+      'VILLA CRESPO': { cumplimiento: 0, pilaresCumplidos: 0, totalPilares: 5, pendiente: true },
+      'DEPOSITO RUTA 9': { cumplimiento: 80, pilaresCumplidos: 4, totalPilares: 5, pendiente: false }
+    }
+  };
+
+  // Calcular desempeño por sucursal basado en datos reales o históricos
+  const sucursalesDesempeno = sucursalesList.map(sucursal => {
+    // Si hay datos históricos para este mes, usarlos
+    if (datosHistoricos[mesKey] && datosHistoricos[mesKey][sucursal]) {
+      const hist = datosHistoricos[mesKey][sucursal];
+      return { nombre: sucursal, ...hist };
+    }
+
+    // Para el mes actual (Enero 2026) o meses sin datos, usar datos del contexto
+    const sucursalData = auditData[sucursal];
+
+    if (!sucursalData) {
+      return {
+        nombre: sucursal,
+        pilaresCumplidos: 0,
+        totalPilares: 5,
+        cumplimiento: 0,
+        pendiente: true
+      };
+    }
+
+    const pilares = Object.values(sucursalData);
+    const totalPilares = pilares.length;
+    const pilaresCumplidos = pilares.filter(p => p.estado === true).length;
+    const pilaresPendientes = pilares.filter(p => p.estado === null).length;
+    const cumplimiento = totalPilares > 0 ? Math.round((pilaresCumplidos / totalPilares) * 100) : 0;
+
+    return {
+      nombre: sucursal,
+      pilaresCumplidos,
+      totalPilares,
+      cumplimiento,
+      pendiente: pilaresPendientes === totalPilares
+    };
+  }).sort((a, b) => b.cumplimiento - a.cumplimiento);
 
   // Calcular estadísticas generales
   const totalSucursales = sucursalesDesempeno.length;
   const sucursalesPendientes = sucursalesDesempeno.filter(s => s.pendiente).length;
   const sucursalesEvaluadas = totalSucursales - sucursalesPendientes;
   const pilaresCumplidosTotal = sucursalesDesempeno.filter(s => !s.pendiente).reduce((sum, s) => sum + s.pilaresCumplidos, 0);
-  const pilaresPosibles = sucursalesEvaluadas * 5;
+  const pilaresPosibles = sucursalesEvaluadas > 0 ? sucursalesDesempeno.filter(s => !s.pendiente).reduce((sum, s) => sum + s.totalPilares, 0) : 0;
   const cumplimientoGeneral = pilaresPosibles > 0 ? Math.round((pilaresCumplidosTotal / pilaresPosibles) * 100) : 0;
 
   // Datos de ejemplo para las estadísticas
@@ -83,53 +174,58 @@ const Dashboard = () => {
     },
   ];
 
-  // Datos para gráfico de estado
+  // Calcular datos para gráfico de estado basado en auditorías reales
+  const hallazgos = getAllHallazgos();
+  const hallazgosCriticos = hallazgos.filter(h => h.criticidad === 'critica' || h.criticidad === 'alta');
+
   const statusData = [
-    { name: 'Completadas', value: 45, color: '#10b981' },
-    { name: 'En Proceso', value: 12, color: '#00d4aa' },
-    { name: 'Pendientes', value: 8, color: '#f59e0b' },
-    { name: 'Vencidas', value: 3, color: '#ef4444' },
+    { name: 'Completadas', value: sucursalesEvaluadas, color: '#10b981' },
+    { name: 'En Proceso', value: 0, color: '#00d4aa' },
+    { name: 'Pendientes', value: sucursalesPendientes, color: '#f59e0b' },
+    { name: 'Hallazgos Críticos', value: hallazgosCriticos.length, color: '#ef4444' },
   ];
 
-  // Auditorías recientes
-  const recentAudits = [
-    {
-      id: 'AUD-2026-001',
-      sucursal: 'LEGUIZAMON',
-      provincia: 'Buenos Aires',
-      auditor: 'María García',
-      fecha: '04/02/2026',
+  // Provincias por sucursal
+  const provinciasPorSucursal = {
+    'LEGUIZAMON': 'Buenos Aires',
+    'CATAMARCA': 'Catamarca',
+    'CONGRESO': 'CABA',
+    'ARENALES': 'CABA',
+    'BELGRANO SUR': 'CABA',
+    'LAPRIDA': 'Buenos Aires',
+    'VILLA CRESPO': 'CABA',
+    'DEPOSITO RUTA 9': 'Buenos Aires'
+  };
+
+  // Auditorías recientes basadas en datos reales
+  const recentAudits = sucursalesDesempeno
+    .filter(s => !s.pendiente)
+    .slice(0, 4)
+    .map((s, idx) => ({
+      id: `AUD-${selectedYear}-${String(idx + 1).padStart(3, '0')}`,
+      sucursal: s.nombre,
+      provincia: provinciasPorSucursal[s.nombre] || 'N/A',
+      auditor: 'Sistema de Auditoría',
+      fecha: `${String(Math.min(28, 10 + idx * 3)).padStart(2, '0')}/${String(selectedMonth + 1).padStart(2, '0')}/${selectedYear}`,
       estado: 'Completada',
-      cumplimiento: 100
-    },
-    {
-      id: 'AUD-2026-002',
-      sucursal: 'CATAMARCA',
-      provincia: 'Catamarca',
-      auditor: 'Carlos López',
-      fecha: '03/02/2026',
-      estado: 'Completada',
-      cumplimiento: 100
-    },
-    {
-      id: 'AUD-2026-003',
-      sucursal: 'CONGRESO',
-      provincia: 'CABA',
-      auditor: 'Ana Martínez',
-      fecha: '02/02/2026',
-      estado: 'Completada',
-      cumplimiento: 80
-    },
-    {
-      id: 'AUD-2026-004',
-      sucursal: 'VILLA CRESPO',
-      provincia: 'CABA',
-      auditor: 'Juan Pérez',
-      fecha: '01/02/2026',
+      cumplimiento: s.cumplimiento
+    }));
+
+  // Agregar sucursales pendientes
+  const pendientes = sucursalesDesempeno
+    .filter(s => s.pendiente)
+    .slice(0, 4 - recentAudits.length)
+    .map((s, idx) => ({
+      id: `AUD-${selectedYear}-${String(recentAudits.length + idx + 1).padStart(3, '0')}`,
+      sucursal: s.nombre,
+      provincia: provinciasPorSucursal[s.nombre] || 'N/A',
+      auditor: 'Pendiente',
+      fecha: '-',
       estado: 'Pendiente',
       cumplimiento: null
-    },
-  ];
+    }));
+
+  const allRecentAudits = [...recentAudits, ...pendientes];
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -144,17 +240,25 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="title-yellow text-2xl">Dashboard de Auditoría</h1>
           <p className="text-mascotera-text-muted mt-1">
             Resumen general del sistema de auditoría
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-2">
-          <ClipboardCheck className="w-5 h-5" />
-          Nueva Auditoría
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={handlePrevMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2 px-4 py-2 bg-mascotera-darker rounded-lg min-w-[180px] justify-center">
+            <CalendarIcon className="w-4 h-4 text-mascotera-accent" />
+            <span className="font-semibold text-mascotera-text">{mesesNombres[selectedMonth]} {selectedYear}</span>
+          </div>
+          <button onClick={handleNextMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -308,7 +412,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {recentAudits.map((audit) => {
+                {allRecentAudits.map((audit) => {
                   return (
                     <tr key={audit.id}>
                       <td className="font-mono text-sm">{audit.id}</td>

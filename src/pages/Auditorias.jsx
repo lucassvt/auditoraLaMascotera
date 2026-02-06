@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
-  Plus,
   Download,
   Filter,
   Calendar,
@@ -9,12 +7,38 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const Auditorias = () => {
   const [selectedPilarDetail, setSelectedPilarDetail] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const [selectedMonth, setSelectedMonth] = useState(0); // Enero
+  const [selectedYear, setSelectedYear] = useState(2026);
+
+  const handlePrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const mesKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
   // Datos mock que simulan la integración con "Mi Sucursal -> Tareas" y "Finanzas"
   const datosIntegracion = {
@@ -325,11 +349,79 @@ const Auditorias = () => {
         },
         decision: null
       }
+    },
+    'DEPOSITO RUTA 9': {
+      ordenLimpieza: {
+        origen: ['Mi Sucursal -> Tareas -> Orden y limpieza', 'Mi Sucursal -> Tareas -> Mantenimiento sucursal'],
+        tareasOrdenLimpieza: {
+          solicitadas: 4,
+          realizadas: 4,
+          tareas: [
+            { id: 1, titulo: 'Limpieza de áreas de carga', realizada: true, tieneImagen: true },
+            { id: 2, titulo: 'Orden en depósito', realizada: true, tieneImagen: true },
+            { id: 3, titulo: 'Limpieza de oficinas', realizada: true, tieneImagen: false },
+            { id: 4, titulo: 'Orden en áreas comunes', realizada: true, tieneImagen: true }
+          ]
+        },
+        tareasMantenimiento: {
+          solicitadas: 2,
+          realizadas: 2,
+          tareas: [
+            { id: 1, titulo: 'Mantenimiento de montacargas', realizada: true, tieneImagen: true },
+            { id: 2, titulo: 'Revisión de instalaciones eléctricas', realizada: true, tieneImagen: false }
+          ]
+        },
+        decision: true,
+        observaciones: 'Todas las tareas completadas satisfactoriamente'
+      },
+      stockCaja: {
+        desviacionesStock: {
+          origen: 'Mi Sucursal -> Tareas -> Control y gestión de stock',
+          valorizado: 2800,
+          permitido: 5000,
+          porcentaje: 0.56,
+          cumple: true,
+          detalle: 'Desviación dentro del rango permitido'
+        },
+        arqueoCaja: {
+          origen: 'Finanzas -> Arqueos y conciliaciones',
+          diferencia: 200,
+          permitido: 500,
+          porcentaje: 0.4,
+          cumple: true,
+          detalle: 'Arqueo diario realizado correctamente'
+        },
+        decision: true
+      }
     }
   };
 
-  // Datos de cumplimiento por sucursal y pilar
-  const sucursales = [
+  // Datos históricos de cumplimiento por mes
+  const cumplimientoPorMes = {
+    '2025-11': [
+      { nombre: 'ARENALES', pilares: { ordenLimpieza: true, serviciosClub: true, gestionAdministrativa: false, pedidosYa: true, stockCaja: false } },
+      { nombre: 'BELGRANO SUR', pilares: { ordenLimpieza: false, serviciosClub: false, gestionAdministrativa: true, pedidosYa: true, stockCaja: false } },
+      { nombre: 'CATAMARCA', pilares: { ordenLimpieza: true, serviciosClub: true, gestionAdministrativa: true, pedidosYa: false, stockCaja: true } },
+      { nombre: 'LEGUIZAMON', pilares: { ordenLimpieza: true, serviciosClub: false, gestionAdministrativa: true, pedidosYa: true, stockCaja: false } },
+      { nombre: 'CONGRESO', pilares: { ordenLimpieza: false, serviciosClub: true, gestionAdministrativa: false, pedidosYa: true, stockCaja: false } },
+      { nombre: 'LAPRIDA', pilares: { ordenLimpieza: false, serviciosClub: false, gestionAdministrativa: false, pedidosYa: false, stockCaja: false } },
+      { nombre: 'VILLA CRESPO', pilares: { ordenLimpieza: true, serviciosClub: true, gestionAdministrativa: true, pedidosYa: true, stockCaja: false } },
+      { nombre: 'DEPOSITO RUTA 9', pilares: { ordenLimpieza: true, gestionAdministrativa: true, stockCaja: true, gestionPedidos: true, mantenimientoVehiculos: true } }
+    ],
+    '2025-12': [
+      { nombre: 'ARENALES', pilares: { ordenLimpieza: false, serviciosClub: true, gestionAdministrativa: true, pedidosYa: false, stockCaja: true } },
+      { nombre: 'BELGRANO SUR', pilares: { ordenLimpieza: false, serviciosClub: true, gestionAdministrativa: false, pedidosYa: true, stockCaja: false } },
+      { nombre: 'CATAMARCA', pilares: { ordenLimpieza: true, serviciosClub: true, gestionAdministrativa: true, pedidosYa: true, stockCaja: true } },
+      { nombre: 'LEGUIZAMON', pilares: { ordenLimpieza: true, serviciosClub: true, gestionAdministrativa: true, pedidosYa: true, stockCaja: false } },
+      { nombre: 'CONGRESO', pilares: { ordenLimpieza: true, serviciosClub: false, gestionAdministrativa: true, pedidosYa: true, stockCaja: false } },
+      { nombre: 'LAPRIDA', pilares: { ordenLimpieza: false, serviciosClub: false, gestionAdministrativa: false, pedidosYa: true, stockCaja: false } },
+      { nombre: 'VILLA CRESPO', pilares: { ordenLimpieza: null, serviciosClub: null, gestionAdministrativa: null, pedidosYa: null, stockCaja: null } },
+      { nombre: 'DEPOSITO RUTA 9', pilares: { ordenLimpieza: true, gestionAdministrativa: true, stockCaja: false, gestionPedidos: true, mantenimientoVehiculos: true } }
+    ]
+  };
+
+  // Datos de cumplimiento por sucursal y pilar (selección por mes)
+  const sucursales = cumplimientoPorMes[mesKey] || [
     {
       nombre: 'ARENALES',
       pilares: {
@@ -399,16 +491,40 @@ const Auditorias = () => {
         pedidosYa: null,
         stockCaja: datosIntegracion['VILLA CRESPO'].stockCaja.decision
       }
+    },
+    {
+      nombre: 'DEPOSITO RUTA 9',
+      pilares: {
+        ordenLimpieza: datosIntegracion['DEPOSITO RUTA 9'].ordenLimpieza.decision,
+        gestionAdministrativa: true,
+        stockCaja: datosIntegracion['DEPOSITO RUTA 9'].stockCaja.decision,
+        gestionPedidos: true,
+        mantenimientoVehiculos: true
+      }
     }
   ];
 
-  const pilares = [
+  // Pilares para sucursales tradicionales
+  const pilaresTradicionales = [
     { key: 'ordenLimpieza', nombre: 'Orden y Limpieza' },
     { key: 'serviciosClub', nombre: 'Servicios y Club la Mascotera' },
     { key: 'gestionAdministrativa', nombre: 'Gestión administrativa y sistema' },
     { key: 'pedidosYa', nombre: 'Pedidos Ya/ Whatsapp WEB' },
     { key: 'stockCaja', nombre: 'Stock y Caja' }
   ];
+
+  // Pilares para DEPOSITO RUTA 9
+  const pilaresDeposito = [
+    { key: 'ordenLimpieza', nombre: 'Orden y Limpieza' },
+    { key: 'gestionAdministrativa', nombre: 'Gestión administrativa y sistema' },
+    { key: 'stockCaja', nombre: 'Stock y Caja' },
+    { key: 'gestionPedidos', nombre: 'Gestión de Pedidos' },
+    { key: 'mantenimientoVehiculos', nombre: 'Mantenimiento de Vehículos' }
+  ];
+
+  // Separar sucursales tradicionales y depósito
+  const sucursalesTradicionales = sucursales.filter(s => s.nombre !== 'DEPOSITO RUTA 9');
+  const depositoRuta9 = sucursales.find(s => s.nombre === 'DEPOSITO RUTA 9');
 
   const handlePilarClick = (sucursal, pilarKey) => {
     const datos = datosIntegracion[sucursal];
@@ -433,23 +549,28 @@ const Auditorias = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-secondary flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            Enero 2026
+          <button onClick={handlePrevMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2 px-4 py-2 bg-mascotera-darker rounded-lg min-w-[180px] justify-center">
+            <Calendar className="w-4 h-4 text-mascotera-accent" />
+            <span className="font-semibold text-mascotera-text">{mesesNombres[selectedMonth]} {selectedYear}</span>
+          </div>
+          <button onClick={handleNextMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
+            <ChevronRight className="w-5 h-5" />
           </button>
           <button className="btn-secondary flex items-center gap-2">
             <Download className="w-4 h-4" />
             Exportar
           </button>
-          <Link to="/auditorias/nueva" className="btn-primary flex items-center gap-2">
-            <Plus className="w-5 h-5" />
-            Nueva Auditoría
-          </Link>
         </div>
       </div>
 
-      {/* Tabla de Resumen */}
+      {/* Tabla de Resumen - Sucursales Tradicionales */}
       <div className="card-mascotera overflow-hidden">
+        <h3 className="text-lg font-semibold text-mascotera-text mb-4 px-6 pt-4">
+          Sucursales Tradicionales
+        </h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -457,7 +578,7 @@ const Auditorias = () => {
                 <th className="px-4 py-3 text-left font-semibold text-mascotera-text bg-mascotera-darker">
                   Sucursales
                 </th>
-                {pilares.map((pilar) => (
+                {pilaresTradicionales.map((pilar) => (
                   <th key={pilar.key} className="px-4 py-3 text-center font-semibold text-mascotera-text bg-mascotera-darker">
                     {pilar.nombre}
                   </th>
@@ -465,7 +586,7 @@ const Auditorias = () => {
               </tr>
             </thead>
             <tbody>
-              {sucursales.map((sucursal, index) => (
+              {sucursalesTradicionales.map((sucursal, index) => (
                 <tr
                   key={sucursal.nombre}
                   className={`border-b border-mascotera-border hover:bg-mascotera-darker/50 ${
@@ -475,7 +596,7 @@ const Auditorias = () => {
                   <td className="px-4 py-4 font-semibold text-mascotera-text">
                     {sucursal.nombre}
                   </td>
-                  {pilares.map((pilar) => (
+                  {pilaresTradicionales.map((pilar) => (
                     <td
                       key={pilar.key}
                       className="px-4 py-4 text-center"
@@ -505,50 +626,168 @@ const Auditorias = () => {
         </div>
       </div>
 
-      {/* Estadísticas Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {pilares.map((pilar) => {
-          const cumplimiento = sucursales.filter(s => s.pilares[pilar.key] === true).length;
-          const noCumplimiento = sucursales.filter(s => s.pilares[pilar.key] === false).length;
-          const pendientes = sucursales.filter(s => s.pilares[pilar.key] === null).length;
-          const evaluados = cumplimiento + noCumplimiento;
-          const porcentaje = evaluados > 0 ? Math.round((cumplimiento / evaluados) * 100) : 0;
+      {/* Tabla de Resumen - Depósito Ruta 9 */}
+      {depositoRuta9 && (
+        <div className="card-mascotera overflow-hidden">
+          <h3 className="text-lg font-semibold text-mascotera-text mb-4 px-6 pt-4">
+            Depósito Ruta 9
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-mascotera-border">
+                  <th className="px-4 py-3 text-left font-semibold text-mascotera-text bg-mascotera-darker">
+                    Sucursal
+                  </th>
+                  {pilaresDeposito.map((pilar) => (
+                    <th key={pilar.key} className="px-4 py-3 text-center font-semibold text-mascotera-text bg-mascotera-darker">
+                      {pilar.nombre}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-mascotera-border hover:bg-mascotera-darker/50 bg-mascotera-card">
+                  <td className="px-4 py-4 font-semibold text-mascotera-text">
+                    {depositoRuta9.nombre}
+                  </td>
+                  {pilaresDeposito.map((pilar) => (
+                    <td
+                      key={pilar.key}
+                      className="px-4 py-4 text-center"
+                      onClick={() => handlePilarClick(depositoRuta9.nombre, pilar.key)}
+                    >
+                      <span
+                        className={`font-bold text-lg cursor-pointer hover:opacity-80 transition-opacity ${
+                          depositoRuta9.pilares[pilar.key] === null
+                            ? 'text-mascotera-warning'
+                            : depositoRuta9.pilares[pilar.key]
+                            ? 'text-mascotera-success'
+                            : 'text-mascotera-danger'
+                        }`}
+                      >
+                        {depositoRuta9.pilares[pilar.key] === null
+                          ? 'PENDIENTE'
+                          : depositoRuta9.pilares[pilar.key]
+                          ? 'SI'
+                          : 'NO'}
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-          return (
-            <div key={pilar.key} className="card-mascotera">
-              <h3 className="text-sm font-semibold text-mascotera-text-muted mb-2">
-                {pilar.nombre}
-              </h3>
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-mascotera-accent">
-                    {cumplimiento}/{evaluados}
-                  </p>
-                  <p className="text-sm text-mascotera-text-muted mt-1">
-                    {porcentaje}% cumplimiento
-                  </p>
-                  {pendientes > 0 && (
-                    <p className="text-xs text-mascotera-warning mt-1">
-                      {pendientes} pendiente{pendientes > 1 ? 's' : ''}
+      {/* Estadísticas Resumen - Sucursales Tradicionales */}
+      <div className="card-mascotera">
+        <h3 className="text-lg font-semibold text-mascotera-text mb-4">
+          Estadísticas - Sucursales Tradicionales
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {pilaresTradicionales.map((pilar) => {
+            const cumplimiento = sucursalesTradicionales.filter(s => s.pilares[pilar.key] === true).length;
+            const noCumplimiento = sucursalesTradicionales.filter(s => s.pilares[pilar.key] === false).length;
+            const pendientes = sucursalesTradicionales.filter(s => s.pilares[pilar.key] === null).length;
+            const evaluados = cumplimiento + noCumplimiento;
+            const porcentaje = evaluados > 0 ? Math.round((cumplimiento / evaluados) * 100) : 0;
+
+            return (
+              <div key={pilar.key} className="p-4 bg-mascotera-darker rounded-lg">
+                <h4 className="text-sm font-semibold text-mascotera-text-muted mb-2">
+                  {pilar.nombre}
+                </h4>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-3xl font-bold text-mascotera-accent">
+                      {cumplimiento}/{evaluados}
                     </p>
-                  )}
+                    <p className="text-sm text-mascotera-text-muted mt-1">
+                      {porcentaje}% cumplimiento
+                    </p>
+                    {pendientes > 0 && (
+                      <p className="text-xs text-mascotera-warning mt-1">
+                        {pendientes} pendiente{pendientes > 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-12 h-12 rounded-full border-4 border-mascotera-accent/20 flex items-center justify-center">
+                    <span className="text-sm font-bold text-mascotera-accent">
+                      {porcentaje}%
+                    </span>
+                  </div>
                 </div>
-                <div className="w-16 h-16 rounded-full border-4 border-mascotera-accent/20 flex items-center justify-center">
-                  <span className="text-xl font-bold text-mascotera-accent">
-                    {porcentaje}%
-                  </span>
+                <div className="mt-3 h-2 bg-mascotera-card rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-mascotera-accent to-mascotera-accent-light rounded-full"
+                    style={{ width: `${porcentaje}%` }}
+                  ></div>
                 </div>
               </div>
-              <div className="mt-3 h-2 bg-mascotera-darker rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-mascotera-accent to-mascotera-accent-light rounded-full"
-                  style={{ width: `${porcentaje}%` }}
-                ></div>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {/* Estadísticas Resumen - Depósito Ruta 9 */}
+      {depositoRuta9 && (
+        <div className="card-mascotera">
+          <h3 className="text-lg font-semibold text-mascotera-text mb-4">
+            Estadísticas - Depósito Ruta 9
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {pilaresDeposito.map((pilar) => {
+              const cumple = depositoRuta9.pilares[pilar.key] === true;
+              const noCumple = depositoRuta9.pilares[pilar.key] === false;
+              const pendiente = depositoRuta9.pilares[pilar.key] === null;
+
+              return (
+                <div key={pilar.key} className="p-4 bg-mascotera-darker rounded-lg">
+                  <h4 className="text-sm font-semibold text-mascotera-text-muted mb-2">
+                    {pilar.nombre}
+                  </h4>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className={`text-3xl font-bold ${
+                        pendiente ? 'text-mascotera-warning' :
+                        cumple ? 'text-mascotera-success' :
+                        'text-mascotera-danger'
+                      }`}>
+                        {pendiente ? 'PENDIENTE' : (cumple ? 'SI' : 'NO')}
+                      </p>
+                    </div>
+                    <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center ${
+                      pendiente ? 'border-mascotera-warning/20' :
+                      cumple ? 'border-mascotera-success/20' :
+                      'border-mascotera-danger/20'
+                    }`}>
+                      <span className={`text-sm font-bold ${
+                        pendiente ? 'text-mascotera-warning' :
+                        cumple ? 'text-mascotera-success' :
+                        'text-mascotera-danger'
+                      }`}>
+                        {pendiente ? '-' : (cumple ? '✓' : '✗')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2 bg-mascotera-card rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        cumple ? 'bg-gradient-to-r from-mascotera-success to-green-400' :
+                        noCumple ? 'bg-gradient-to-r from-mascotera-danger to-red-400' :
+                        'bg-mascotera-warning'
+                      }`}
+                      style={{ width: pendiente ? '50%' : '100%' }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Modal de Detalle */}
       {modalOpen && selectedPilarDetail && (
