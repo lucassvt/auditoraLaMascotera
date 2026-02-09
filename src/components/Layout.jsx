@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   FileSearch,
   FileText,
+  Printer,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -43,6 +44,12 @@ const Layout = ({ children }) => {
       icon: FileText,
       label: 'Reportes',
       description: 'Hallazgos e informes'
+    },
+    {
+      path: '/informe',
+      icon: Printer,
+      label: 'Informe Auditoría',
+      description: 'Generar informes PDF'
     },
     {
       path: '/sucursales',

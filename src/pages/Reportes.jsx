@@ -25,12 +25,19 @@ import {
   ShieldAlert,
   TrendingDown,
   Repeat,
-  XCircle
+  XCircle,
+  FileCheck,
+  Printer,
+  Trash2,
+  Users
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
+import { useNavigate } from 'react-router-dom';
 
 const Reportes = () => {
-  const { getAllHallazgos } = useAudit();
+  const { getAllHallazgos, sucursalesNombres, generatedReports, getReportsByMes, deleteReport } = useAudit();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('hallazgos');
   const [filterType, setFilterType] = useState('todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedHallazgo, setSelectedHallazgo] = useState(null);
@@ -578,15 +585,9 @@ const Reportes = () => {
     { key: 'mantenimientoVehiculos', nombre: 'Mantenimiento de Vehículos' }
   ];
 
-  const sucursales = [
-    'LEGUIZAMON',
-    'CATAMARCA',
-    'CONGRESO',
-    'ARENALES',
-    'BELGRANO SUR',
-    'LAPRIDA',
-    'VILLA CRESPO',
-    'DEPOSITO RUTA 9'
+  const sucursales = sucursalesNombres.length > 0 ? sucursalesNombres : [
+    'LEGUIZAMON', 'CATAMARCA', 'CONGRESO', 'ARENALES',
+    'BELGRANO SUR', 'LAPRIDA'
   ];
 
   const handleImageSelect = (e) => {
@@ -667,6 +668,40 @@ const Reportes = () => {
           </button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-mascotera-darker p-1 rounded-xl">
+        <button
+          onClick={() => setActiveTab('hallazgos')}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+            activeTab === 'hallazgos'
+              ? 'bg-mascotera-card text-mascotera-accent shadow'
+              : 'text-mascotera-text-muted hover:text-mascotera-text'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4" />
+          Hallazgos
+        </button>
+        <button
+          onClick={() => setActiveTab('informes')}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+            activeTab === 'informes'
+              ? 'bg-mascotera-card text-mascotera-accent shadow'
+              : 'text-mascotera-text-muted hover:text-mascotera-text'
+          }`}
+        >
+          <FileCheck className="w-4 h-4" />
+          Informes Generados
+          {generatedReports.length > 0 && (
+            <span className="bg-mascotera-accent/20 text-mascotera-accent text-xs font-bold px-2 py-0.5 rounded-full">
+              {generatedReports.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ===== TAB: Hallazgos ===== */}
+      {activeTab === 'hallazgos' && (<>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -1026,7 +1061,7 @@ const Reportes = () => {
         </div>
       )}
 
-      {/* Modal Nuevo Hallazgo */}
+      {/* Modal Nuevo Hallazgo (dentro de tab hallazgos) */}
       {nuevoHallazgoModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-mascotera-card rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1232,6 +1267,138 @@ const Reportes = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      </>)}
+
+      {/* ===== TAB: Informes Generados ===== */}
+      {activeTab === 'informes' && (
+        <div className="space-y-6">
+          {/* Stats de informes */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="card-mascotera text-center">
+              <p className="text-3xl font-bold text-mascotera-text">{generatedReports.length}</p>
+              <p className="text-sm text-mascotera-text-muted mt-1">Total Informes</p>
+            </div>
+            <div className="card-mascotera text-center">
+              <p className="text-3xl font-bold text-mascotera-accent">{getReportsByMes(mesKey).length}</p>
+              <p className="text-sm text-mascotera-text-muted mt-1">Este Período</p>
+            </div>
+            <div className="card-mascotera text-center">
+              <p className="text-3xl font-bold text-mascotera-success">
+                {generatedReports.reduce((sum, r) => sum + (r.resumen?.aprobados || 0), 0)}
+              </p>
+              <p className="text-sm text-mascotera-text-muted mt-1">Pilares Aprobados</p>
+            </div>
+            <div className="card-mascotera text-center">
+              <p className="text-3xl font-bold text-mascotera-danger">
+                {generatedReports.reduce((sum, r) => sum + (r.resumen?.noAprobados || 0), 0)}
+              </p>
+              <p className="text-sm text-mascotera-text-muted mt-1">Pilares No Aprobados</p>
+            </div>
+          </div>
+
+          {/* Lista de informes */}
+          {generatedReports.length === 0 ? (
+            <div className="card-mascotera text-center py-16">
+              <FileCheck className="w-16 h-16 text-mascotera-text-muted mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-mascotera-text mb-2">No hay informes generados</h3>
+              <p className="text-mascotera-text-muted max-w-md mx-auto">
+                Los informes se generan desde el módulo de Pilares una vez que todos los pilares de una sucursal han sido evaluados.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {generatedReports.map(report => {
+                const fecha = new Date(report.fechaGeneracion);
+                return (
+                  <div
+                    key={report.id}
+                    className="card-mascotera hover:border-mascotera-accent/50 transition-all cursor-pointer"
+                    onClick={() => navigate(`/informe?reportId=${report.id}`)}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-lg bg-mascotera-accent/10 flex-shrink-0">
+                        <FileCheck className="w-6 h-6 text-mascotera-accent" />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-sm text-mascotera-accent">{report.id}</span>
+                              <span className="badge badge-success">Generado</span>
+                            </div>
+                            <h3 className="font-semibold text-mascotera-text mt-2">
+                              Informe de Auditoría - {report.sucursal}
+                            </h3>
+                            <p className="text-sm text-mascotera-text-muted mt-1">
+                              Período: {report.mesKey} | {report.resumen?.totalPilares || 0} pilares evaluados
+                            </p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-mascotera-text-muted flex-shrink-0" />
+                        </div>
+
+                        {/* Resumen */}
+                        <div className="flex items-center gap-4 mt-3 flex-wrap">
+                          <span className="flex items-center gap-1.5 text-sm">
+                            <CheckCircle2 className="w-4 h-4 text-mascotera-success" />
+                            <span className="text-mascotera-success font-semibold">{report.resumen?.aprobados || 0}</span>
+                            <span className="text-mascotera-text-muted">aprobados</span>
+                          </span>
+                          <span className="flex items-center gap-1.5 text-sm">
+                            <XCircle className="w-4 h-4 text-mascotera-danger" />
+                            <span className="text-mascotera-danger font-semibold">{report.resumen?.noAprobados || 0}</span>
+                            <span className="text-mascotera-text-muted">no aprobados</span>
+                          </span>
+                          <span className="flex items-center gap-1.5 text-sm">
+                            <span className="text-mascotera-accent font-semibold">{report.resumen?.promedioPonderacion || '0'}%</span>
+                            <span className="text-mascotera-text-muted">ponderación</span>
+                          </span>
+                        </div>
+
+                        {/* Meta */}
+                        <div className="flex items-center gap-6 mt-3 text-sm text-mascotera-text-muted flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <Building2 className="w-4 h-4" />
+                            {report.sucursal}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-4 h-4" />
+                            {(report.auditores || []).join(', ') || 'Sin auditores'}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {report.descargos?.length > 0 && (
+                            <span className="flex items-center gap-1 text-mascotera-warning">
+                              <MessageSquare className="w-4 h-4" />
+                              {report.descargos.length} descargo(s)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`¿Eliminar informe ${report.id}?`)) {
+                            deleteReport(report.id);
+                          }
+                        }}
+                        className="p-2 text-mascotera-text-muted hover:text-mascotera-danger hover:bg-mascotera-danger/10 rounded-lg transition-colors flex-shrink-0"
+                        title="Eliminar informe"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

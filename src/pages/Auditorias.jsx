@@ -9,12 +9,20 @@ import {
   XCircle,
   AlertCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ClipboardCheck,
+  MessageSquare
 } from 'lucide-react';
+import { useAudit } from '../context/AuditContext';
+import DescargosSection from '../components/DescargosSection';
 
 const Auditorias = () => {
+  const { sucursalesNombres, sucursalesDB, tareasResumen, conteosStock, fetchTareasResumen, fetchTareasSucursal, fetchConteosStock } = useAudit();
   const [selectedPilarDetail, setSelectedPilarDetail] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('auditorias');
+  const [tareasDetalle, setTareasDetalle] = useState([]);
+  const [loadingTareas, setLoadingTareas] = useState(false);
 
   const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const [selectedMonth, setSelectedMonth] = useState(0); // Enero
@@ -421,7 +429,7 @@ const Auditorias = () => {
   };
 
   // Datos de cumplimiento por sucursal y pilar (selección por mes)
-  const sucursales = cumplimientoPorMes[mesKey] || [
+  const sucursalesMockMesActual = [
     {
       nombre: 'ARENALES',
       pilares: {
@@ -504,6 +512,17 @@ const Auditorias = () => {
     }
   ];
 
+  // Agregar sucursales de la DB que no tienen datos mock
+  const nombresConMock = new Set(sucursalesMockMesActual.map(s => s.nombre));
+  const sucursalesNuevasDB = sucursalesNombres
+    .filter(nombre => !nombresConMock.has(nombre))
+    .map(nombre => ({
+      nombre,
+      pilares: { ordenLimpieza: null, serviciosClub: null, gestionAdministrativa: null, pedidosYa: null, stockCaja: null }
+    }));
+
+  const sucursales = cumplimientoPorMes[mesKey] || [...sucursalesMockMesActual, ...sucursalesNuevasDB];
+
   // Pilares para sucursales tradicionales
   const pilaresTradicionales = [
     { key: 'ordenLimpieza', nombre: 'Orden y Limpieza' },
@@ -526,13 +545,46 @@ const Auditorias = () => {
   const sucursalesTradicionales = sucursales.filter(s => s.nombre !== 'DEPOSITO RUTA 9');
   const depositoRuta9 = sucursales.find(s => s.nombre === 'DEPOSITO RUTA 9');
 
-  const handlePilarClick = (sucursal, pilarKey) => {
+  // Refetch tareas y conteos cuando cambia el mes
+  React.useEffect(() => {
+    fetchTareasResumen(mesKey);
+    fetchConteosStock(mesKey);
+  }, [mesKey]);
+
+  // Helper: get tareas resumen for a sucursal
+  const getTareasForSucursal = (sucursalNombre) => {
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === sucursalNombre);
+    if (!sucDB) return { ordenLimpieza: null, mantenimiento: null };
+    const ordenLimpieza = tareasResumen.find(t => t.sucursal_id === sucDB.id && t.categoria === 'ORDEN Y LIMPIEZA');
+    const mantenimiento = tareasResumen.find(t => t.sucursal_id === sucDB.id && t.categoria === 'MANTENIMIENTO SUCURSAL');
+    return { ordenLimpieza, mantenimiento };
+  };
+
+  // Helper: get conteos for a sucursal
+  const getConteosForSucursal = (sucursalNombre) => {
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === sucursalNombre);
+    if (!sucDB) return null;
+    return conteosStock.filter(c => c.sucursal_id === sucDB.id);
+  };
+
+  const handlePilarClick = async (sucursal, pilarKey) => {
     const datos = datosIntegracion[sucursal];
-    if (datos && (pilarKey === 'ordenLimpieza' || pilarKey === 'stockCaja')) {
+    if (pilarKey === 'ordenLimpieza' || pilarKey === 'stockCaja') {
+      // Load real task details for this sucursal
+      const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === sucursal);
+      if (sucDB && pilarKey === 'ordenLimpieza') {
+        setLoadingTareas(true);
+        const tareas = await fetchTareasSucursal(sucDB.id, mesKey);
+        setTareasDetalle(Array.isArray(tareas) ? tareas : []);
+        setLoadingTareas(false);
+      }
+
       setSelectedPilarDetail({
         sucursal,
         pilar: pilarKey,
-        datos: datos[pilarKey]
+        datos: datos ? datos[pilarKey] : null,
+        tareasDB: getTareasForSucursal(sucursal),
+        conteosDB: getConteosForSucursal(sucursal)
       });
       setModalOpen(true);
     }
@@ -566,6 +618,35 @@ const Auditorias = () => {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 bg-mascotera-darker rounded-lg p-1">
+        <button
+          onClick={() => setActiveTab('auditorias')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            activeTab === 'auditorias'
+              ? 'bg-mascotera-accent text-mascotera-dark'
+              : 'text-mascotera-text-muted hover:text-mascotera-text hover:bg-mascotera-card'
+          }`}
+        >
+          <ClipboardCheck className="w-4 h-4" />
+          Auditorias
+        </button>
+        <button
+          onClick={() => setActiveTab('descargos')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            activeTab === 'descargos'
+              ? 'bg-mascotera-accent text-mascotera-dark'
+              : 'text-mascotera-text-muted hover:text-mascotera-text hover:bg-mascotera-card'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          Descargos
+        </button>
+      </div>
+
+      {activeTab === 'descargos' && <DescargosSection />}
+
+      {activeTab === 'auditorias' && <>
       {/* Tabla de Resumen - Sucursales Tradicionales */}
       <div className="card-mascotera overflow-hidden">
         <h3 className="text-lg font-semibold text-mascotera-text mb-4 px-6 pt-4">
@@ -596,10 +677,29 @@ const Auditorias = () => {
                   <td className="px-4 py-4 font-semibold text-mascotera-text">
                     {sucursal.nombre}
                   </td>
-                  {pilaresTradicionales.map((pilar) => (
+                  {pilaresTradicionales.map((pilar) => {
+                    const tareasInfo = pilar.key === 'ordenLimpieza' ? getTareasForSucursal(sucursal.nombre) : null;
+                    const conteosInfo = pilar.key === 'stockCaja' ? getConteosForSucursal(sucursal.nombre) : null;
+
+                    // Calcular datos de tareas
+                    let tareasSolicitadas = 0, tareasCompletadas = 0, tareasPct = 0;
+                    if (tareasInfo) {
+                      tareasSolicitadas = (tareasInfo.ordenLimpieza ? parseInt(tareasInfo.ordenLimpieza.solicitadas) : 0) + (tareasInfo.mantenimiento ? parseInt(tareasInfo.mantenimiento.solicitadas) : 0);
+                      tareasCompletadas = (tareasInfo.ordenLimpieza ? parseInt(tareasInfo.ordenLimpieza.completadas) : 0) + (tareasInfo.mantenimiento ? parseInt(tareasInfo.mantenimiento.completadas) : 0);
+                      tareasPct = tareasSolicitadas > 0 ? Math.round((tareasCompletadas / tareasSolicitadas) * 100) : 0;
+                    }
+
+                    // Calcular datos de conteos
+                    let netoDif = 0, totalConteos = 0;
+                    if (conteosInfo && conteosInfo.length > 0) {
+                      netoDif = conteosInfo.reduce((sum, c) => sum + parseFloat(c.neto_diferencia || 0), 0);
+                      totalConteos = conteosInfo.reduce((sum, c) => sum + parseInt(c.total_conteos || 0), 0);
+                    }
+
+                    return (
                     <td
                       key={pilar.key}
-                      className="px-4 py-4 text-center"
+                      className="px-4 py-3 text-center"
                       onClick={() => handlePilarClick(sucursal.nombre, pilar.key)}
                     >
                       <span
@@ -617,8 +717,28 @@ const Auditorias = () => {
                           ? 'SI'
                           : 'NO'}
                       </span>
+                      {/* Dato anexo Orden y Limpieza */}
+                      {pilar.key === 'ordenLimpieza' && tareasSolicitadas > 0 && (
+                        <div className="mt-1">
+                          <div className="text-xs text-mascotera-text-muted">{tareasCompletadas}/{tareasSolicitadas} tareas</div>
+                          <div className="w-full h-1.5 bg-mascotera-darker rounded-full mt-1 mx-auto max-w-[80px]">
+                            <div className={`h-full rounded-full ${tareasPct >= 80 ? 'bg-mascotera-success' : tareasPct >= 50 ? 'bg-mascotera-warning' : 'bg-mascotera-danger'}`} style={{ width: `${tareasPct}%` }}></div>
+                          </div>
+                          <div className={`text-xs font-semibold mt-0.5 ${tareasPct >= 80 ? 'text-mascotera-success' : tareasPct >= 50 ? 'text-mascotera-warning' : 'text-mascotera-danger'}`}>{tareasPct}%</div>
+                        </div>
+                      )}
+                      {/* Dato anexo Stock y Caja */}
+                      {pilar.key === 'stockCaja' && totalConteos > 0 && (
+                        <div className="mt-1">
+                          <div className={`text-xs font-semibold ${netoDif === 0 ? 'text-mascotera-success' : 'text-mascotera-warning'}`}>
+                            ${Math.abs(netoDif).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          </div>
+                          <div className="text-xs text-mascotera-text-muted">{totalConteos} conteo{totalConteos !== 1 ? 's' : ''}</div>
+                        </div>
+                      )}
                     </td>
-                  ))}
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -651,10 +771,27 @@ const Auditorias = () => {
                   <td className="px-4 py-4 font-semibold text-mascotera-text">
                     {depositoRuta9.nombre}
                   </td>
-                  {pilaresDeposito.map((pilar) => (
+                  {pilaresDeposito.map((pilar) => {
+                    const tareasInfo = pilar.key === 'ordenLimpieza' ? getTareasForSucursal(depositoRuta9.nombre) : null;
+                    const conteosInfo = pilar.key === 'stockCaja' ? getConteosForSucursal(depositoRuta9.nombre) : null;
+
+                    let tareasSolicitadas = 0, tareasCompletadas = 0, tareasPct = 0;
+                    if (tareasInfo) {
+                      tareasSolicitadas = (tareasInfo.ordenLimpieza ? parseInt(tareasInfo.ordenLimpieza.solicitadas) : 0) + (tareasInfo.mantenimiento ? parseInt(tareasInfo.mantenimiento.solicitadas) : 0);
+                      tareasCompletadas = (tareasInfo.ordenLimpieza ? parseInt(tareasInfo.ordenLimpieza.completadas) : 0) + (tareasInfo.mantenimiento ? parseInt(tareasInfo.mantenimiento.completadas) : 0);
+                      tareasPct = tareasSolicitadas > 0 ? Math.round((tareasCompletadas / tareasSolicitadas) * 100) : 0;
+                    }
+
+                    let netoDif = 0, totalConteos = 0;
+                    if (conteosInfo && conteosInfo.length > 0) {
+                      netoDif = conteosInfo.reduce((sum, c) => sum + parseFloat(c.neto_diferencia || 0), 0);
+                      totalConteos = conteosInfo.reduce((sum, c) => sum + parseInt(c.total_conteos || 0), 0);
+                    }
+
+                    return (
                     <td
                       key={pilar.key}
-                      className="px-4 py-4 text-center"
+                      className="px-4 py-3 text-center"
                       onClick={() => handlePilarClick(depositoRuta9.nombre, pilar.key)}
                     >
                       <span
@@ -672,8 +809,26 @@ const Auditorias = () => {
                           ? 'SI'
                           : 'NO'}
                       </span>
+                      {pilar.key === 'ordenLimpieza' && tareasSolicitadas > 0 && (
+                        <div className="mt-1">
+                          <div className="text-xs text-mascotera-text-muted">{tareasCompletadas}/{tareasSolicitadas} tareas</div>
+                          <div className="w-full h-1.5 bg-mascotera-darker rounded-full mt-1 mx-auto max-w-[80px]">
+                            <div className={`h-full rounded-full ${tareasPct >= 80 ? 'bg-mascotera-success' : tareasPct >= 50 ? 'bg-mascotera-warning' : 'bg-mascotera-danger'}`} style={{ width: `${tareasPct}%` }}></div>
+                          </div>
+                          <div className={`text-xs font-semibold mt-0.5 ${tareasPct >= 80 ? 'text-mascotera-success' : tareasPct >= 50 ? 'text-mascotera-warning' : 'text-mascotera-danger'}`}>{tareasPct}%</div>
+                        </div>
+                      )}
+                      {pilar.key === 'stockCaja' && totalConteos > 0 && (
+                        <div className="mt-1">
+                          <div className={`text-xs font-semibold ${netoDif === 0 ? 'text-mascotera-success' : 'text-mascotera-warning'}`}>
+                            ${Math.abs(netoDif).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          </div>
+                          <div className="text-xs text-mascotera-text-muted">{totalConteos} conteo{totalConteos !== 1 ? 's' : ''}</div>
+                        </div>
+                      )}
                     </td>
-                  ))}
+                    );
+                  })}
                 </tr>
               </tbody>
             </table>
@@ -844,107 +999,109 @@ const Auditorias = () => {
                     </div>
                   </div>
 
-                  {/* Origen de datos */}
-                  <div className="bg-mascotera-darker p-4 rounded-lg">
-                    <h3 className="text-sm font-semibold text-mascotera-text-muted mb-2">Origen de Datos</h3>
-                    <div className="space-y-1">
-                      {selectedPilarDetail.datos.origen.map((fuente, idx) => (
-                        <p key={idx} className="text-sm text-mascotera-accent">{fuente}</p>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Dato Anexo: Tareas desde Mi Sucursal (DB real) */}
+                  {(() => {
+                    const tareasOL = tareasDetalle.filter(t => t.categoria === 'ORDEN Y LIMPIEZA');
+                    const tareasMS = tareasDetalle.filter(t => t.categoria === 'MANTENIMIENTO SUCURSAL');
+                    const resumenOL = selectedPilarDetail.tareasDB?.ordenLimpieza;
+                    const resumenMS = selectedPilarDetail.tareasDB?.mantenimiento;
+                    const totalSolicitadas = (resumenOL ? parseInt(resumenOL.solicitadas) : 0) + (resumenMS ? parseInt(resumenMS.solicitadas) : 0);
+                    const totalCompletadas = (resumenOL ? parseInt(resumenOL.completadas) : 0) + (resumenMS ? parseInt(resumenMS.completadas) : 0);
+                    const totalPendientes = (resumenOL ? parseInt(resumenOL.pendientes) : 0) + (resumenMS ? parseInt(resumenMS.pendientes) : 0);
+                    const pctTotal = totalSolicitadas > 0 ? ((totalCompletadas / totalSolicitadas) * 100).toFixed(1) : 0;
 
-                  {/* Tareas de Orden y Limpieza */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-mascotera-text mb-4">
-                      Tareas de Orden y Limpieza
-                    </h3>
-                    <div className="bg-mascotera-darker p-4 rounded-lg mb-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-mascotera-text-muted">Ratio de cumplimiento</span>
-                        <span className="text-2xl font-bold text-mascotera-accent">
-                          {selectedPilarDetail.datos.tareasOrdenLimpieza.realizadas} / {selectedPilarDetail.datos.tareasOrdenLimpieza.solicitadas}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-2 bg-mascotera-card rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-mascotera-accent to-mascotera-accent-light"
-                          style={{
-                            width: `${selectedPilarDetail.datos.tareasOrdenLimpieza.solicitadas > 0
-                              ? (selectedPilarDetail.datos.tareasOrdenLimpieza.realizadas / selectedPilarDetail.datos.tareasOrdenLimpieza.solicitadas) * 100
-                              : 0}%`
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {selectedPilarDetail.datos.tareasOrdenLimpieza.tareas.map((tarea) => (
-                        <div key={tarea.id} className="flex items-center justify-between p-3 bg-mascotera-darker rounded-lg">
-                          <div className="flex items-center gap-3">
-                            {tarea.realizada ? (
-                              <CheckCircle2 className="w-5 h-5 text-mascotera-success" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-mascotera-danger" />
-                            )}
-                            <span className="text-mascotera-text">{tarea.titulo}</span>
-                          </div>
-                          {tarea.tieneImagen && (
-                            <div className="flex items-center gap-2 text-mascotera-accent text-sm">
-                              <ImageIcon className="w-4 h-4" />
-                              <span>Con imagen</span>
-                            </div>
-                          )}
+                    return (
+                      <div className="border-2 border-mascotera-accent/30 rounded-lg p-4 space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 rounded-full bg-mascotera-accent animate-pulse"></div>
+                          <h3 className="text-sm font-bold text-mascotera-accent uppercase tracking-wider">
+                            Dato Anexo - Mi Sucursal: Tareas
+                          </h3>
                         </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Tareas de Mantenimiento */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-mascotera-text mb-4">
-                      Tareas de Mantenimiento Sucursal
-                    </h3>
-                    <div className="bg-mascotera-darker p-4 rounded-lg mb-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-mascotera-text-muted">Ratio de cumplimiento</span>
-                        <span className="text-2xl font-bold text-mascotera-accent">
-                          {selectedPilarDetail.datos.tareasMantenimiento.realizadas} / {selectedPilarDetail.datos.tareasMantenimiento.solicitadas}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-2 bg-mascotera-card rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-mascotera-accent to-mascotera-accent-light"
-                          style={{
-                            width: `${selectedPilarDetail.datos.tareasMantenimiento.solicitadas > 0
-                              ? (selectedPilarDetail.datos.tareasMantenimiento.realizadas / selectedPilarDetail.datos.tareasMantenimiento.solicitadas) * 100
-                              : 0}%`
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {selectedPilarDetail.datos.tareasMantenimiento.tareas.map((tarea) => (
-                        <div key={tarea.id} className="flex items-center justify-between p-3 bg-mascotera-darker rounded-lg">
-                          <div className="flex items-center gap-3">
-                            {tarea.realizada ? (
-                              <CheckCircle2 className="w-5 h-5 text-mascotera-success" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-mascotera-danger" />
-                            )}
-                            <span className="text-mascotera-text">{tarea.titulo}</span>
+                        {/* Resumen general */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                            <p className="text-2xl font-bold text-mascotera-text">{totalSolicitadas}</p>
+                            <p className="text-xs text-mascotera-text-muted">Solicitadas</p>
                           </div>
-                          {tarea.tieneImagen && (
-                            <div className="flex items-center gap-2 text-mascotera-accent text-sm">
-                              <ImageIcon className="w-4 h-4" />
-                              <span>Con imagen</span>
-                            </div>
-                          )}
+                          <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                            <p className="text-2xl font-bold text-mascotera-success">{totalCompletadas}</p>
+                            <p className="text-xs text-mascotera-text-muted">Completadas</p>
+                          </div>
+                          <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                            <p className="text-2xl font-bold text-mascotera-warning">{totalPendientes}</p>
+                            <p className="text-xs text-mascotera-text-muted">Pendientes</p>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+
+                        {/* Barra de progreso */}
+                        <div className="bg-mascotera-darker p-3 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-mascotera-text-muted">Cumplimiento total</span>
+                            <span className="text-lg font-bold text-mascotera-accent">{pctTotal}%</span>
+                          </div>
+                          <div className="h-3 bg-mascotera-card rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${parseFloat(pctTotal) >= 80 ? 'bg-gradient-to-r from-mascotera-success to-green-400' : parseFloat(pctTotal) >= 50 ? 'bg-gradient-to-r from-mascotera-warning to-yellow-400' : 'bg-gradient-to-r from-mascotera-danger to-red-400'}`}
+                              style={{ width: `${pctTotal}%` }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Desglose por categoria */}
+                        {resumenOL && (
+                          <div className="bg-mascotera-darker p-3 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-semibold text-mascotera-text">Orden y Limpieza</span>
+                              <span className="text-sm text-mascotera-accent font-bold">{resumenOL.completadas}/{resumenOL.solicitadas} ({resumenOL.porcentaje_completado}%)</span>
+                            </div>
+                          </div>
+                        )}
+                        {resumenMS && (
+                          <div className="bg-mascotera-darker p-3 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-semibold text-mascotera-text">Mantenimiento Sucursal</span>
+                              <span className="text-sm text-mascotera-accent font-bold">{resumenMS.completadas}/{resumenMS.solicitadas} ({resumenMS.porcentaje_completado}%)</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Listado de tareas individuales */}
+                        {loadingTareas ? (
+                          <div className="text-center py-4">
+                            <div className="w-6 h-6 border-2 border-mascotera-accent border-t-transparent rounded-full animate-spin mx-auto"></div>
+                          </div>
+                        ) : tareasDetalle.length > 0 ? (
+                          <div className="space-y-2">
+                            {tareasDetalle.map((tarea) => (
+                              <div key={tarea.id} className="flex items-center justify-between p-3 bg-mascotera-darker rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  {tarea.estado === 'completada' ? (
+                                    <CheckCircle2 className="w-5 h-5 text-mascotera-success flex-shrink-0" />
+                                  ) : (
+                                    <XCircle className="w-5 h-5 text-mascotera-warning flex-shrink-0" />
+                                  )}
+                                  <div>
+                                    <span className="text-mascotera-text text-sm">{tarea.titulo}</span>
+                                    <span className="text-xs text-mascotera-text-muted ml-2">({tarea.categoria})</span>
+                                  </div>
+                                </div>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${tarea.estado === 'completada' ? 'bg-mascotera-success/20 text-mascotera-success' : 'bg-mascotera-warning/20 text-mascotera-warning'}`}>
+                                  {tarea.estado}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-mascotera-text-muted text-center py-4">No hay tareas registradas para este periodo</p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Decisión del Auditor */}
+                  {selectedPilarDetail.datos && (
                   <div className="bg-mascotera-darker p-4 rounded-lg">
                     <h3 className="text-sm font-semibold text-mascotera-text-muted mb-2">Decisión del Auditor</h3>
                     <div className="flex items-center gap-3 mb-2">
@@ -967,6 +1124,7 @@ const Auditorias = () => {
                     </div>
                     <p className="text-sm text-mascotera-text-muted">{selectedPilarDetail.datos.observaciones}</p>
                   </div>
+                  )}
                 </>
               )}
 
@@ -1006,79 +1164,94 @@ const Auditorias = () => {
                     </div>
                   </div>
 
-                  {/* Desviaciones de Stock */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-mascotera-text mb-4">
-                      Desviaciones de Stock Valorizadas
-                    </h3>
-                    <div className="bg-mascotera-darker p-4 rounded-lg">
-                      <p className="text-xs text-mascotera-text-muted mb-3">
-                        Origen: {selectedPilarDetail.datos.desviacionesStock.origen}
-                      </p>
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div>
-                          <p className="text-sm text-mascotera-text-muted">Desviación valorizada</p>
-                          <p className="text-2xl font-bold text-mascotera-text">
-                            ${selectedPilarDetail.datos.desviacionesStock.valorizado.toLocaleString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-mascotera-text-muted">Límite permitido</p>
-                          <p className="text-2xl font-bold text-mascotera-accent">
-                            ${selectedPilarDetail.datos.desviacionesStock.permitido.toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {selectedPilarDetail.datos.desviacionesStock.cumple === null ? (
-                          <AlertCircle className="w-5 h-5 text-mascotera-warning" />
-                        ) : selectedPilarDetail.datos.desviacionesStock.cumple ? (
-                          <CheckCircle2 className="w-5 h-5 text-mascotera-success" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-mascotera-danger" />
-                        )}
-                        <span className="text-sm text-mascotera-text">{selectedPilarDetail.datos.desviacionesStock.detalle}</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Dato Anexo: Conteos de Stock desde Mi Sucursal (DB real) */}
+                  {(() => {
+                    const conteos = selectedPilarDetail.conteosDB || [];
+                    const totalConteos = conteos.reduce((sum, c) => sum + parseInt(c.total_conteos || 0), 0);
+                    const netoDiferencia = conteos.reduce((sum, c) => sum + parseFloat(c.neto_diferencia || 0), 0);
+                    const totalProductos = conteos.reduce((sum, c) => sum + parseInt(c.total_productos || 0), 0);
+                    const productosContados = conteos.reduce((sum, c) => sum + parseInt(c.productos_contados || 0), 0);
+                    const productosConDiferencia = conteos.reduce((sum, c) => sum + parseInt(c.productos_con_diferencia || 0), 0);
+                    const pctContados = totalProductos > 0 ? ((productosContados / totalProductos) * 100).toFixed(1) : 0;
 
-                  {/* Arqueos y Conciliaciones */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-mascotera-text mb-4">
-                      Arqueos y Conciliaciones
-                    </h3>
-                    <div className="bg-mascotera-darker p-4 rounded-lg">
-                      <p className="text-xs text-mascotera-text-muted mb-3">
-                        Origen: {selectedPilarDetail.datos.arqueoCaja.origen}
-                      </p>
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div>
-                          <p className="text-sm text-mascotera-text-muted">Diferencia detectada</p>
-                          <p className="text-2xl font-bold text-mascotera-text">
-                            ${selectedPilarDetail.datos.arqueoCaja.diferencia.toLocaleString()}
-                          </p>
+                    return (
+                      <div className="border-2 border-mascotera-accent/30 rounded-lg p-4 space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 rounded-full bg-mascotera-accent animate-pulse"></div>
+                          <h3 className="text-sm font-bold text-mascotera-accent uppercase tracking-wider">
+                            Dato Anexo - Mi Sucursal: Conteos de Stock
+                          </h3>
                         </div>
-                        <div>
-                          <p className="text-sm text-mascotera-text-muted">Límite permitido</p>
-                          <p className="text-2xl font-bold text-mascotera-accent">
-                            ${selectedPilarDetail.datos.arqueoCaja.permitido.toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {selectedPilarDetail.datos.arqueoCaja.cumple === null ? (
-                          <AlertCircle className="w-5 h-5 text-mascotera-warning" />
-                        ) : selectedPilarDetail.datos.arqueoCaja.cumple ? (
-                          <CheckCircle2 className="w-5 h-5 text-mascotera-success" />
+
+                        {totalConteos > 0 ? (
+                          <>
+                            {/* Resumen general */}
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                                <p className="text-2xl font-bold text-mascotera-text">{totalConteos}</p>
+                                <p className="text-xs text-mascotera-text-muted">Conteos realizados</p>
+                              </div>
+                              <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                                <p className="text-2xl font-bold text-mascotera-text">{totalProductos}</p>
+                                <p className="text-xs text-mascotera-text-muted">Total productos</p>
+                              </div>
+                              <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                                <p className="text-2xl font-bold text-mascotera-warning">{productosConDiferencia}</p>
+                                <p className="text-xs text-mascotera-text-muted">Con diferencia</p>
+                              </div>
+                            </div>
+
+                            {/* Neto de diferencias */}
+                            <div className="bg-mascotera-darker p-4 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-mascotera-text-muted">Neto ajustes de stock (valorizado)</span>
+                                <span className={`text-2xl font-bold ${netoDiferencia === 0 ? 'text-mascotera-success' : netoDiferencia > 0 ? 'text-mascotera-warning' : 'text-mascotera-danger'}`}>
+                                  ${Math.abs(netoDiferencia).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                  {netoDiferencia !== 0 && <span className="text-sm ml-1">({netoDiferencia > 0 ? 'sobrante' : 'faltante'})</span>}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Progreso de conteo */}
+                            <div className="bg-mascotera-darker p-3 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-mascotera-text-muted">Productos contados</span>
+                                <span className="text-lg font-bold text-mascotera-accent">{productosContados}/{totalProductos} ({pctContados}%)</span>
+                              </div>
+                              <div className="h-3 bg-mascotera-card rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${parseFloat(pctContados) >= 80 ? 'bg-gradient-to-r from-mascotera-success to-green-400' : parseFloat(pctContados) >= 50 ? 'bg-gradient-to-r from-mascotera-warning to-yellow-400' : 'bg-gradient-to-r from-mascotera-danger to-red-400'}`}
+                                  style={{ width: `${pctContados}%` }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            {/* Desglose por estado */}
+                            {conteos.map((conteo, idx) => (
+                              <div key={idx} className="bg-mascotera-darker p-3 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${conteo.estado === 'finalizado' ? 'bg-mascotera-success/20 text-mascotera-success' : conteo.estado === 'en_proceso' ? 'bg-mascotera-warning/20 text-mascotera-warning' : 'bg-mascotera-accent/20 text-mascotera-accent'}`}>
+                                      {conteo.estado}
+                                    </span>
+                                    <span className="text-sm text-mascotera-text">{conteo.total_conteos} conteo(s)</span>
+                                  </div>
+                                  <span className={`text-sm font-bold ${parseFloat(conteo.neto_diferencia) === 0 ? 'text-mascotera-success' : 'text-mascotera-warning'}`}>
+                                    Dif: ${parseFloat(conteo.neto_diferencia).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </>
                         ) : (
-                          <XCircle className="w-5 h-5 text-mascotera-danger" />
+                          <p className="text-sm text-mascotera-text-muted text-center py-4">No hay conteos de stock registrados para este periodo</p>
                         )}
-                        <span className="text-sm text-mascotera-text">{selectedPilarDetail.datos.arqueoCaja.detalle}</span>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Decisión del Auditor */}
+                  {selectedPilarDetail.datos && (
                   <div className="bg-mascotera-darker p-4 rounded-lg">
                     <h3 className="text-sm font-semibold text-mascotera-text-muted mb-2">Decisión del Auditor</h3>
                     <div className="flex items-center gap-3">
@@ -1100,12 +1273,14 @@ const Auditorias = () => {
                       </span>
                     </div>
                   </div>
+                  )}
                 </>
               )}
             </div>
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 };

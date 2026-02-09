@@ -1,0 +1,12 @@
+services:
+  auditoria:
+    build: .
+    ports:
+      - "3001:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build: ./server
+    restart: unless-stopped

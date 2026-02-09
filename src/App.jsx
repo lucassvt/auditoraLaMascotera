@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuditProvider } from './context/AuditContext';
 import Layout from './components/Layout';
@@ -8,6 +7,7 @@ import Checklist from './pages/Checklist';
 import Reportes from './pages/Reportes';
 import Sucursales from './pages/Sucursales';
 import NuevaAuditoria from './pages/NuevaAuditoria';
+import InformeAuditoria from './pages/InformeAuditoria';
 
 function App() {
   return (
@@ -21,6 +21,7 @@ function App() {
             <Route path="/checklist" element={<Checklist />} />
             <Route path="/reportes" element={<Reportes />} />
             <Route path="/sucursales" element={<Sucursales />} />
+            <Route path="/informe" element={<InformeAuditoria />} />
           </Routes>
         </Layout>
       </Router>

@@ -16,8 +16,10 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
+import { useAudit } from '../context/AuditContext';
 
 const Sucursales = () => {
+  const { sucursalesNombres } = useAudit();
   const [selectedSucursal, setSelectedSucursal] = useState(null);
 
   // Meses a mostrar en el histórico (6 meses)
@@ -140,6 +142,17 @@ const Sucursales = () => {
   // Calcular resumen de sucursal
   const calcularResumen = (sucursalKey) => {
     const data = historico[sucursalKey];
+    if (!data) {
+      return {
+        cumplimientoActual: 0,
+        cumplimientoHistorico: 0,
+        totalPilares: 5,
+        aprobadosUltimo: 0,
+        evaluadosUltimo: 0,
+        patronesCriticos: 0,
+        patronesPositivos: 0
+      };
+    }
     const pilares = Object.keys(data);
     const ultimoMes = {};
     let totalAprobadosUltimo = 0;
@@ -192,9 +205,9 @@ const Sucursales = () => {
     };
   };
 
-  const sucursalesBase = [
+  const sucursalesBase = sucursalesNombres.length > 0 ? sucursalesNombres : [
     'LEGUIZAMON', 'CATAMARCA', 'CONGRESO', 'ARENALES',
-    'BELGRANO SUR', 'LAPRIDA', 'VILLA CRESPO', 'DEPOSITO RUTA 9'
+    'BELGRANO SUR', 'LAPRIDA'
   ];
 
   // Ordenar: más patrones críticos primero, luego menor cumplimiento
@@ -229,6 +242,31 @@ const Sucursales = () => {
   // Vista de detalle de una sucursal
   const renderDetalle = () => {
     const data = historico[selectedSucursal];
+    if (!data) {
+      return (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSelectedSucursal(null)}
+              className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="title-yellow text-2xl">{selectedSucursal}</h1>
+              <p className="text-mascotera-text-muted mt-1">Sin datos historicos disponibles</p>
+            </div>
+          </div>
+          <div className="card-mascotera h-64 flex items-center justify-center">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-mascotera-warning mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-mascotera-text mb-2">Sin Historico</h3>
+              <p className="text-mascotera-text-muted">Esta sucursal aun no tiene datos de auditorias previas.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     const pilaresBase = selectedSucursal === 'DEPOSITO RUTA 9' ? pilaresDeposito : pilaresTradicionales;
     // Ordenar pilares: peores patrones primero
     const pilares = [...pilaresBase].sort((a, b) => {
