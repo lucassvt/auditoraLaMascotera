@@ -180,7 +180,7 @@ export const AuditProvider = ({ children }) => {
   };
 
   // --- Funciones de informes generados ---
-  const generateReport = (sucursal, mesKey, pilaresData, resumen) => {
+  const generateReport = async (sucursal, mesKey, pilaresData, resumen, pilarScores = {}) => {
     const descargosFiltered = descargos.filter(d => {
       const nombre = d.sucursal_nombre ? d.sucursal_nombre.replace(/^SUCURSAL\s+/i, '') : `Sucursal #${d.sucursal_id}`;
       return nombre === sucursal;
@@ -199,11 +199,51 @@ export const AuditProvider = ({ children }) => {
     };
 
     setGeneratedReports(prev => [report, ...prev]);
+
+    // Persistir en la base de datos para que Mi Sucursal pueda consultarlo
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === sucursal);
+    if (sucDB) {
+      try {
+        const dbResponse = await fetch('/api/informes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sucursal_id: sucDB.id,
+            periodo: mesKey,
+            orden_limpieza: pilarScores.ordenLimpieza ?? null,
+            pedidos: pilarScores.pedidosYa ?? null,
+            gestion_administrativa: pilarScores.gestionAdministrativa ?? null,
+            club_mascotera: pilarScores.serviciosClub ?? null,
+            control_stock_caja: pilarScores.stockCaja ?? null,
+            puntaje_total: parseFloat(resumen.promedioPonderacion) || null,
+            data_json: report
+          })
+        });
+        if (dbResponse.ok) {
+          const dbRecord = await dbResponse.json();
+          report.dbId = dbRecord.id;
+        }
+      } catch (err) {
+        console.error('Error persistiendo informe en DB:', err);
+      }
+    }
+
     return report;
   };
 
-  const deleteReport = (reportId) => {
+  const deleteReport = async (reportId) => {
+    // Find the report to get dbId before removing
+    const report = generatedReports.find(r => r.id === reportId);
     setGeneratedReports(prev => prev.filter(r => r.id !== reportId));
+
+    // Also delete from database if it was persisted
+    if (report?.dbId) {
+      try {
+        await fetch(`/api/informes/${report.dbId}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Error eliminando informe de DB:', err);
+      }
+    }
   };
 
   const getReportsByMes = (mesKey) => {

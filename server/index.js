@@ -286,6 +286,104 @@ app.get('/api/conteos-stock', async (req, res) => {
   }
 });
 
+// POST /api/informes - guardar informe de auditoría en la base de datos
+app.post('/api/informes', async (req, res) => {
+  const {
+    sucursal_id, periodo, orden_limpieza, pedidos,
+    gestion_administrativa, club_mascotera, control_stock_caja,
+    puntaje_total, observaciones, data_json
+  } = req.body;
+
+  if (!sucursal_id || !periodo) {
+    return res.status(400).json({ error: 'sucursal_id y periodo son requeridos' });
+  }
+
+  try {
+    const result = await poolMiSucursal.query(`
+      INSERT INTO auditoria_mensual
+        (sucursal_id, periodo, orden_limpieza, pedidos, gestion_administrativa,
+         club_mascotera, control_stock_caja, puntaje_total, observaciones,
+         data_json, estado, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'generado', CURRENT_TIMESTAMP)
+      RETURNING *
+    `, [
+      sucursal_id, periodo,
+      orden_limpieza || null, pedidos || null, gestion_administrativa || null,
+      club_mascotera || null, control_stock_caja || null,
+      puntaje_total || null, observaciones || null,
+      data_json ? JSON.stringify(data_json) : null
+    ]);
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error guardando informe:', err.message);
+    res.status(500).json({ error: 'Error al guardar informe' });
+  }
+});
+
+// GET /api/informes - obtener informes de auditoría (filtrable por sucursal_id y periodo)
+app.get('/api/informes', async (req, res) => {
+  try {
+    const { sucursal_id, periodo } = req.query;
+    let query = `SELECT * FROM auditoria_mensual`;
+    const conditions = [];
+    const params = [];
+
+    if (sucursal_id) {
+      conditions.push(`sucursal_id = $${params.length + 1}`);
+      params.push(sucursal_id);
+    }
+    if (periodo) {
+      conditions.push(`periodo = $${params.length + 1}`);
+      params.push(periodo);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    query += ' ORDER BY created_at DESC';
+
+    const result = await poolMiSucursal.query(query, params);
+
+    // Enrich with sucursal names from dux_integrada
+    if (result.rows.length > 0) {
+      const sucIds = [...new Set(result.rows.map(r => r.sucursal_id))];
+      const sucResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre FROM sucursales WHERE id = ANY($1)`, [sucIds]
+      );
+      const sucMap = {};
+      sucResult.rows.forEach(s => { sucMap[s.id] = s.nombre; });
+      result.rows.forEach(r => {
+        r.sucursal_nombre = sucMap[r.sucursal_id] || `Sucursal #${r.sucursal_id}`;
+      });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error consultando informes:', err.message);
+    res.status(500).json({ error: 'Error al consultar informes' });
+  }
+});
+
+// DELETE /api/informes/:id - eliminar un informe de auditoría
+app.delete('/api/informes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await poolMiSucursal.query(
+      `DELETE FROM auditoria_mensual WHERE id = $1 RETURNING id`, [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Informe no encontrado' });
+    }
+
+    res.json({ deleted: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error('Error eliminando informe:', err.message);
+    res.status(500).json({ error: 'Error al eliminar informe' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

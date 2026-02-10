@@ -37,6 +37,10 @@ const Checklist = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [auditoresLocal, setAuditoresLocal] = useState(['']);
   const [generandoInforme, setGenerandoInforme] = useState(false);
+  const [autoEvaluatedItems, setAutoEvaluatedItems] = useState({});
+
+  // Umbral de aprobación automática de stock (valor absoluto en pesos)
+  const STOCK_THRESHOLD = 150000;
 
   // Lista de sucursales desde la base de datos
   const sucursales = sucursalesNombres.length > 0 ? sucursalesNombres : [
@@ -229,6 +233,11 @@ const Checklist = () => {
     // Si ya tiene ese valor, lo resetea a null (sin evaluar)
     data.items[itemIndex] = data.items[itemIndex] === value ? null : value;
 
+    // Si el auditor modifica manualmente un item auto-evaluado, quitar flag auto
+    if (pilarKey === 'stockCaja' && itemIndex === 0) {
+      setAutoEvaluatedItems(prev => ({ ...prev, 'stockCaja-0': false }));
+    }
+
     // Auto-determinar estado cuando TODOS los items están evaluados
     const pilares = getPilares();
     const pilar = pilares[pilarKey];
@@ -384,6 +393,39 @@ const Checklist = () => {
     }
   }, [selectedSucursal, mesKey]);
 
+  // Auto-evaluar item 0 de stockCaja basándose en conteos_stock
+  // Si |neto_diferencia| >= $150.000 → item NO CUMPLE y pilar NO APROBADO automáticamente
+  // Si |neto_diferencia| < $150.000 → item CUMPLE
+  useEffect(() => {
+    if (!selectedSucursal) return;
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
+    if (!sucDB) return;
+
+    const conteos = conteosStock.filter(c => c.sucursal_id === sucDB.id);
+    if (conteos.length === 0) return;
+
+    const netoDiferencia = conteos.reduce((sum, c) => sum + parseFloat(c.neto_diferencia || 0), 0);
+    const cumple = Math.abs(netoDiferencia) < STOCK_THRESHOLD;
+
+    const data = initPilarData('stockCaja');
+    const itemKey = 'stockCaja-0';
+    const wasAutoEvaluated = autoEvaluatedItems[itemKey];
+
+    // Solo auto-evaluar si: no fue evaluado aún, o fue auto-evaluado previamente
+    if (data.items[0] === null || wasAutoEvaluated) {
+      data.items[0] = cumple;
+      setAutoEvaluatedItems(prev => ({ ...prev, [itemKey]: true }));
+
+      // Si excede el umbral, desaprobar el pilar completo automáticamente
+      if (!cumple) {
+        data.estado = false;
+        data.tieneHallazgo = true;
+      }
+
+      setAuditData({ ...auditData });
+    }
+  }, [conteosStock, selectedSucursal, sucursalesDB]);
+
   // Helper: get tareas resumen for current sucursal
   const getTareasResumen = () => {
     const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
@@ -508,7 +550,7 @@ const Checklist = () => {
   };
 
   // Generar informe snapshot
-  const handleGenerarInforme = () => {
+  const handleGenerarInforme = async () => {
     const auditoresValidos = auditoresLocal.filter(a => a.trim());
     if (auditoresValidos.length === 0) {
       alert('Debe ingresar al menos un auditor antes de generar el informe.');
@@ -518,14 +560,28 @@ const Checklist = () => {
     setGenerandoInforme(true);
     const pilaresData = auditData[selectedSucursal];
     const resumen = calcResumen();
-    const report = generateReport(selectedSucursal, mesKey, pilaresData, resumen);
-    setGenerandoInforme(false);
 
-    if (report) {
-      const goToReport = confirm(`Informe ${report.id} generado exitosamente.\n\n¿Desea ir a Reportes para verlo?`);
-      if (goToReport) {
-        navigate('/reportes');
+    // Calcular puntajes individuales por pilar para persistir en DB
+    const pilaresObj = getPilares();
+    const pilarScores = {};
+    Object.keys(pilaresObj).forEach(key => {
+      const pond = calcPonderacion(key, pilaresObj[key]);
+      pilarScores[key] = pond ? parseFloat(pond.porcentaje) : null;
+    });
+
+    try {
+      const report = await generateReport(selectedSucursal, mesKey, pilaresData, resumen, pilarScores);
+      setGenerandoInforme(false);
+
+      if (report) {
+        const goToReport = confirm(`Informe ${report.id} generado exitosamente.\n\n¿Desea ir a Reportes para verlo?`);
+        if (goToReport) {
+          navigate('/reportes');
+        }
       }
+    } catch (err) {
+      console.error('Error generando informe:', err);
+      setGenerandoInforme(false);
     }
   };
 
@@ -827,6 +883,19 @@ const Checklist = () => {
 
                       {totalConteos > 0 ? (
                         <>
+                          <div className={`flex items-center justify-between p-3 rounded-lg border ${Math.abs(netoDiferencia) < STOCK_THRESHOLD ? 'border-mascotera-success/50 bg-mascotera-success/10' : 'border-mascotera-danger/50 bg-mascotera-danger/10'}`}>
+                            <span className="text-xs text-mascotera-text-muted">
+                              Umbral auto-aprobación: <strong className="text-mascotera-text">${STOCK_THRESHOLD.toLocaleString('es-AR')}</strong>
+                            </span>
+                            <span className="text-xs">
+                              Diferencia neta: <strong className="text-mascotera-text">${Math.abs(netoDiferencia).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong>
+                              {' → '}
+                              {Math.abs(netoDiferencia) < STOCK_THRESHOLD
+                                ? <span className="font-bold text-mascotera-success">CUMPLE</span>
+                                : <span className="font-bold text-mascotera-danger">NO CUMPLE</span>
+                              }
+                            </span>
+                          </div>
                           <div className="grid grid-cols-3 gap-3">
                             <div className="bg-mascotera-darker p-3 rounded-lg text-center">
                               <p className="text-2xl font-bold text-mascotera-text">{totalConteos}</p>
@@ -1007,6 +1076,11 @@ const Checklist = () => {
                         )}
                         {data.items[idx] === false && (
                           <span className="text-xs font-semibold px-2 py-0.5 rounded bg-mascotera-danger/20 text-mascotera-danger">NO CUMPLE</span>
+                        )}
+                        {autoEvaluatedItems[`${pilarKey}-${idx}`] && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-mascotera-accent/20 text-mascotera-accent ml-1" title="Evaluado automáticamente desde datos de conteos de stock">
+                            AUTO
+                          </span>
                         )}
                       </div>
                     ))}
