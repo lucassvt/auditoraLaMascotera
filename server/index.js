@@ -5,7 +5,7 @@ const { createTunnel, LOCAL_PORT } = require('./ssh-tunnel');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 let poolMiSucursal;
 let poolDuxIntegrada;
