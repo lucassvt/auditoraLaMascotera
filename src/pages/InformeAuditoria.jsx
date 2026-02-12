@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Building2,
@@ -25,8 +25,27 @@ const InformeAuditoria = () => {
   const navigate = useNavigate();
   const [selectedSucursal, setSelectedSucursal] = useState('');
 
+  // Soporte para cargar informe desde la DB (para Mi Sucursal)
+  const [dbReport, setDbReport] = useState(null);
+  const [loadingDbReport, setLoadingDbReport] = useState(false);
+  const dbId = searchParams.get('dbId');
+
+  useEffect(() => {
+    if (!dbId) return;
+    setLoadingDbReport(true);
+    fetch(`/api/informes/${dbId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.data_json) {
+          setDbReport(data.data_json);
+        }
+        setLoadingDbReport(false);
+      })
+      .catch(() => setLoadingDbReport(false));
+  }, [dbId]);
+
   const reportId = searchParams.get('reportId');
-  const viewingReport = reportId ? generatedReports.find(r => r.id === reportId) : null;
+  const viewingReport = dbReport || (reportId ? generatedReports.find(r => r.id === reportId) : null);
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -275,6 +294,17 @@ const InformeAuditoria = () => {
       day: '2-digit', month: '2-digit', year: 'numeric'
     });
   };
+
+  if (loadingDbReport) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mascotera-accent mx-auto mb-4"></div>
+          <p className="text-mascotera-text-muted">Cargando informe...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn">
