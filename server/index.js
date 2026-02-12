@@ -365,6 +365,32 @@ app.get('/api/informes', async (req, res) => {
   }
 });
 
+// GET /api/informes/:id - obtener un informe específico por ID
+app.get('/api/informes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await poolMiSucursal.query(
+      `SELECT * FROM auditoria_mensual WHERE id = $1`, [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Informe no encontrado' });
+    }
+
+    // Enrich with sucursal name
+    const row = result.rows[0];
+    const sucResult = await poolDuxIntegrada.query(
+      `SELECT nombre FROM sucursales WHERE id = $1`, [row.sucursal_id]
+    );
+    row.sucursal_nombre = sucResult.rows[0]?.nombre || `Sucursal #${row.sucursal_id}`;
+
+    res.json(row);
+  } catch (err) {
+    console.error('Error consultando informe:', err.message);
+    res.status(500).json({ error: 'Error al consultar informe' });
+  }
+});
+
 // DELETE /api/informes/:id - eliminar un informe de auditoría
 app.delete('/api/informes/:id', async (req, res) => {
   try {
