@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const AuditContext = createContext();
 
@@ -47,7 +48,7 @@ export const AuditProvider = ({ children }) => {
 
   // Fetch sucursales desde la API
   useEffect(() => {
-    fetch('/api/sucursales')
+    fetch(`${API_BASE}/sucursales`)
       .then(res => res.json())
       .then(data => {
         setSucursalesDB(data);
@@ -62,7 +63,7 @@ export const AuditProvider = ({ children }) => {
   // Fetch descargos desde la API
   const fetchDescargos = () => {
     setLoadingDescargos(true);
-    fetch('/api/descargos')
+    fetch(`${API_BASE}/descargos`)
       .then(res => res.json())
       .then(data => {
         setDescargos(data);
@@ -81,7 +82,7 @@ export const AuditProvider = ({ children }) => {
   // Actualizar estado de un descargo
   const updateDescargoEstado = async (id, estado, comentarioAuditor = null) => {
     try {
-      const response = await fetch(`/api/descargos/${id}/estado`, {
+      const response = await fetch(`${API_BASE}/descargos/${id}/estado`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -101,7 +102,7 @@ export const AuditProvider = ({ children }) => {
   // Fetch tareas por sucursal (Orden y Limpieza + Mantenimiento)
   const fetchTareasResumen = (mes) => {
     const query = mes ? `?mes=${mes}` : '';
-    fetch(`/api/tareas-sucursal${query}`)
+    fetch(`${API_BASE}/tareas-sucursal${query}`)
       .then(res => res.json())
       .then(data => setTareasResumen(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error cargando tareas:', err));
@@ -111,7 +112,7 @@ export const AuditProvider = ({ children }) => {
   const fetchTareasSucursal = async (sucursalId, mes) => {
     try {
       const query = mes ? `?mes=${mes}` : '';
-      const res = await fetch(`/api/tareas-sucursal/${sucursalId}${query}`);
+      const res = await fetch(`${API_BASE}/tareas-sucursal/${sucursalId}${query}`);
       return await res.json();
     } catch (err) {
       console.error('Error cargando tareas sucursal:', err);
@@ -122,7 +123,7 @@ export const AuditProvider = ({ children }) => {
   // Fetch conteos de stock
   const fetchConteosStock = (mes) => {
     const query = mes ? `?mes=${mes}` : '';
-    fetch(`/api/conteos-stock${query}`)
+    fetch(`${API_BASE}/conteos-stock${query}`)
       .then(res => res.json())
       .then(data => setConteosStock(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error cargando conteos:', err));
@@ -204,7 +205,7 @@ export const AuditProvider = ({ children }) => {
     const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === sucursal);
     if (sucDB) {
       try {
-        const dbResponse = await fetch('/api/informes', {
+        const dbResponse = await fetch(`${API_BASE}/informes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -239,7 +240,7 @@ export const AuditProvider = ({ children }) => {
     // Also delete from database if it was persisted
     if (report?.dbId) {
       try {
-        await fetch(`/api/informes/${report.dbId}`, { method: 'DELETE' });
+        await fetch(`${API_BASE}/informes/${report.dbId}`, { method: 'DELETE' });
       } catch (err) {
         console.error('Error eliminando informe de DB:', err);
       }

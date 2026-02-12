@@ -17,6 +17,7 @@ import {
   Lock
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
+import { API_BASE } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
 const InformeAuditoria = () => {
@@ -33,7 +34,7 @@ const InformeAuditoria = () => {
   useEffect(() => {
     if (!dbId) return;
     setLoadingDbReport(true);
-    fetch(`/api/informes/${dbId}`)
+    fetch(`${API_BASE}/informes/${dbId}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.data_json) {
