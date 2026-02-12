@@ -12,7 +12,7 @@ import InformeAuditoria from './pages/InformeAuditoria';
 function App() {
   return (
     <AuditProvider>
-      <Router>
+      <Router basename="/auditoria">
         <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
