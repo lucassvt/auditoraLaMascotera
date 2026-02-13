@@ -27,7 +27,13 @@ export const AuditProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const stored = localStorage.getItem('audit_current_user');
-      return stored ? JSON.parse(stored) : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Solo aceptar datos del nuevo formato (con accessLevel del backend)
+        if (parsed && parsed.accessLevel) return parsed;
+        localStorage.removeItem('audit_current_user');
+      }
+      return null;
     } catch { return null; }
   });
 
