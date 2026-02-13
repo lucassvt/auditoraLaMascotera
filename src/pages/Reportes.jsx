@@ -900,18 +900,20 @@ const Reportes = () => {
             </div>
           </div>
 
-          {/* Lista de informes */}
-          {generatedReports.length === 0 ? (
+          {/* Lista de informes filtrados por mes */}
+          {(() => {
+            const reportesMes = getReportsByMes(mesKey);
+            return reportesMes.length === 0 ? (
             <div className="card-mascotera text-center py-16">
               <FileCheck className="w-16 h-16 text-mascotera-text-muted mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-mascotera-text mb-2">No hay informes generados</h3>
+              <h3 className="text-lg font-semibold text-mascotera-text mb-2">No hay informes para {mesesNombres[selectedMonth]} {selectedYear}</h3>
               <p className="text-mascotera-text-muted max-w-md mx-auto">
                 Los informes se generan desde el módulo de Pilares una vez que todos los pilares de una sucursal han sido evaluados.
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {generatedReports.map(report => {
+              {reportesMes.map(report => {
                 const fecha = new Date(report.fechaGeneracion);
                 return (
                   <div
@@ -1014,7 +1016,8 @@ const Reportes = () => {
                 );
               })}
             </div>
-          )}
+          );
+          })()}
         </div>
       )}
     </div>
