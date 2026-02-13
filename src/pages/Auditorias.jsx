@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  Download,
-  Filter,
   Calendar,
   X,
   Image as ImageIcon,
@@ -151,10 +149,6 @@ const Auditorias = () => {
           </div>
           <button onClick={handleNextMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
             <ChevronRight className="w-5 h-5" />
-          </button>
-          <button className="btn-secondary flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Exportar
           </button>
         </div>
       </div>
