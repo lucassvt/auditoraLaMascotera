@@ -157,17 +157,6 @@ const Sucursales = () => {
     return ra.cumplimientoActual - rb.cumplimientoActual;
   });
 
-  const provinciasPorSucursal = {
-    'LEGUIZAMON': 'Buenos Aires',
-    'CATAMARCA': 'Catamarca',
-    'CONGRESO': 'CABA',
-    'ARENALES': 'CABA',
-    'BELGRANO SUR': 'CABA',
-    'LAPRIDA': 'Buenos Aires',
-    'VILLA CRESPO': 'CABA',
-    'DEPOSITO RUTA 9': 'Buenos Aires'
-  };
-
   // Prioridad de patrón: peores primero
   const patronPrioridad = {
     'siempre_desaprueba': 0,
@@ -228,7 +217,7 @@ const Sucursales = () => {
           <div>
             <h1 className="title-yellow text-2xl">{selectedSucursal}</h1>
             <p className="text-mascotera-text-muted mt-1">
-              {provinciasPorSucursal[selectedSucursal]} — Histórico de desempeño por pilar
+              Histórico de desempeño por pilar
             </p>
           </div>
         </div>
@@ -516,7 +505,7 @@ const Sucursales = () => {
                 </div>
 
                 <h3 className="font-semibold text-mascotera-text text-lg">{sucursal}</h3>
-                <p className="text-xs text-mascotera-text-muted mb-4">{provinciasPorSucursal[sucursal]}</p>
+                <p className="text-xs text-mascotera-text-muted mb-4">Sucursal</p>
 
                 {/* Cumplimiento actual */}
                 <div className="flex items-end justify-between mb-2">
