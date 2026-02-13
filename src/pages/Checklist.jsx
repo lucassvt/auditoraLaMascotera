@@ -740,6 +740,71 @@ const Checklist = () => {
       {/* Pilares de Auditoría */}
       {selectedSucursal && (
         <div className="space-y-6">
+          {/* Estado de Informes del Período */}
+          {(() => {
+            const reportStatus = getReportTypesForSucursalMes(selectedSucursal, mesKey);
+            const step = reportStatus.hasFinal ? 3 : reportStatus.hasPreliminar ? 2 : 1;
+            return (
+              <div className={`card-mascotera border-l-4 ${
+                step === 3 ? 'border-l-mascotera-success' : step === 2 ? 'border-l-mascotera-accent' : 'border-l-mascotera-warning'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-mascotera-text uppercase tracking-wider">
+                    Estado de Informes - {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+                  </h3>
+                  <span className="text-xs text-mascotera-text-muted">Máximo 2 informes por mes</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Step 1: Preliminar */}
+                  <div className={`flex-1 p-3 rounded-lg border-2 text-center transition-all ${
+                    step === 1
+                      ? 'border-mascotera-warning bg-mascotera-warning/10'
+                      : 'border-mascotera-success/50 bg-mascotera-success/5'
+                  }`}>
+                    <div className={`text-xs font-bold ${step === 1 ? 'text-mascotera-warning' : 'text-mascotera-success'}`}>
+                      {step === 1 ? 'PENDIENTE' : 'ENVIADO'}
+                    </div>
+                    <div className="text-sm font-semibold text-mascotera-text mt-1">Informe Preliminar</div>
+                  </div>
+
+                  {/* Arrow */}
+                  <ChevronRight className={`w-5 h-5 flex-shrink-0 ${step >= 2 ? 'text-mascotera-accent' : 'text-mascotera-text-muted'}`} />
+
+                  {/* Step 2: Final */}
+                  <div className={`flex-1 p-3 rounded-lg border-2 text-center transition-all ${
+                    step === 3
+                      ? 'border-mascotera-success/50 bg-mascotera-success/5'
+                      : step === 2
+                        ? 'border-mascotera-warning bg-mascotera-warning/10'
+                        : 'border-mascotera-border bg-mascotera-darker/30'
+                  }`}>
+                    <div className={`text-xs font-bold ${
+                      step === 3 ? 'text-mascotera-success' : step === 2 ? 'text-mascotera-warning' : 'text-mascotera-text-muted'
+                    }`}>
+                      {step === 3 ? 'ENVIADO' : step === 2 ? 'PENDIENTE' : 'BLOQUEADO'}
+                    </div>
+                    <div className={`text-sm font-semibold mt-1 ${step >= 2 ? 'text-mascotera-text' : 'text-mascotera-text-muted'}`}>Informe Final</div>
+                  </div>
+
+                  {/* Arrow */}
+                  <ChevronRight className={`w-5 h-5 flex-shrink-0 ${step === 3 ? 'text-mascotera-success' : 'text-mascotera-text-muted'}`} />
+
+                  {/* Step 3: Complete */}
+                  <div className={`flex-1 p-3 rounded-lg border-2 text-center transition-all ${
+                    step === 3
+                      ? 'border-mascotera-success bg-mascotera-success/10'
+                      : 'border-mascotera-border bg-mascotera-darker/30'
+                  }`}>
+                    <div className={`text-xs font-bold ${step === 3 ? 'text-mascotera-success' : 'text-mascotera-text-muted'}`}>
+                      {step === 3 ? 'COMPLETO' : '-'}
+                    </div>
+                    <div className={`text-sm font-semibold mt-1 ${step === 3 ? 'text-mascotera-success' : 'text-mascotera-text-muted'}`}>Auditoría Cerrada</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="card-mascotera">
             <h3 className="text-lg font-semibold text-mascotera-text mb-4">
               Auditoría de Pilares - {selectedSucursal}

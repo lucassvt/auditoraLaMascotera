@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import {
   Plus,
   Search,
-  Filter,
-  Download,
   FileText,
   AlertTriangle,
   AlertCircle,
@@ -436,28 +434,6 @@ const Reportes = () => {
               <AlertTriangle className="w-4 h-4" />
               No Conformidades
             </button>
-            <button
-              onClick={() => setFilterType('observacion')}
-              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-                filterType === 'observacion'
-                  ? 'bg-mascotera-warning/20 text-mascotera-warning font-semibold'
-                  : 'bg-mascotera-darker text-mascotera-text-muted hover:text-mascotera-text'
-              }`}
-            >
-              <Info className="w-4 h-4" />
-              Observaciones
-            </button>
-            <button
-              onClick={() => setFilterType('buena_practica')}
-              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-                filterType === 'buena_practica'
-                  ? 'bg-mascotera-success/20 text-mascotera-success font-semibold'
-                  : 'bg-mascotera-darker text-mascotera-text-muted hover:text-mascotera-text'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Buenas Prácticas
-            </button>
           </div>
         </div>
       </div>
@@ -792,8 +768,6 @@ const Reportes = () => {
                     className="input-mascotera w-full"
                   >
                     <option value="no_conformidad">No Conformidad</option>
-                    <option value="observacion">Observación</option>
-                    <option value="buena_practica">Buena Práctica</option>
                   </select>
                 </div>
 
@@ -807,10 +781,10 @@ const Reportes = () => {
                     onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, severidad: e.target.value })}
                     className="input-mascotera w-full"
                   >
+                    <option value="critica">Crítica</option>
                     <option value="alta">Alta</option>
                     <option value="media">Media</option>
                     <option value="baja">Baja</option>
-                    <option value="positivo">Positivo</option>
                   </select>
                 </div>
               </div>
