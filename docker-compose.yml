@@ -9,4 +9,9 @@ services:
 
   api:
     build: ./server
+    volumes:
+      - uploads_data:/app/uploads
     restart: unless-stopped
+
+volumes:
+  uploads_data:

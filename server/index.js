@@ -1,11 +1,44 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { createTunnel, LOCAL_PORT } = require('./ssh-tunnel');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Configurar almacenamiento de imágenes
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `obs-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    const extname = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowed.test(file.mimetype);
+    if (extname && mimetype) return cb(null, true);
+    cb(new Error('Solo se permiten imágenes (jpeg, jpg, png, gif, webp)'));
+  }
+});
+
+// Servir imágenes subidas
+app.use('/api/uploads', express.static(UPLOADS_DIR));
 
 let poolMiSucursal;
 let poolDuxIntegrada;
@@ -410,6 +443,178 @@ app.delete('/api/informes/:id', async (req, res) => {
   }
 });
 
+// ========== OBSERVACIONES POR PILAR ==========
+
+// Crear tabla si no existe (se ejecuta al iniciar)
+async function initObservacionesTable() {
+  try {
+    await poolMiSucursal.query(`
+      CREATE TABLE IF NOT EXISTS observaciones_pilar (
+        id SERIAL PRIMARY KEY,
+        sucursal_id INTEGER NOT NULL,
+        pilar_key VARCHAR(50) NOT NULL,
+        periodo VARCHAR(7) NOT NULL,
+        texto TEXT NOT NULL,
+        criticidad VARCHAR(20) DEFAULT 'media',
+        imagenes JSONB DEFAULT '[]',
+        creado_por VARCHAR(100) NOT NULL,
+        estado VARCHAR(20) DEFAULT 'pendiente',
+        comentario_auditor TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Tabla observaciones_pilar verificada/creada');
+  } catch (err) {
+    console.error('Error creando tabla observaciones_pilar:', err.message);
+  }
+}
+
+// GET /api/observaciones - obtener observaciones (filtrable por sucursal_id, pilar_key, periodo)
+app.get('/api/observaciones', async (req, res) => {
+  try {
+    const { sucursal_id, pilar_key, periodo } = req.query;
+    let query = `SELECT * FROM observaciones_pilar`;
+    const conditions = [];
+    const params = [];
+
+    if (sucursal_id) {
+      conditions.push(`sucursal_id = $${params.length + 1}`);
+      params.push(sucursal_id);
+    }
+    if (pilar_key) {
+      conditions.push(`pilar_key = $${params.length + 1}`);
+      params.push(pilar_key);
+    }
+    if (periodo) {
+      conditions.push(`periodo = $${params.length + 1}`);
+      params.push(periodo);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    query += ' ORDER BY created_at DESC';
+
+    const result = await poolMiSucursal.query(query, params);
+
+    // Enrich with sucursal names
+    if (result.rows.length > 0) {
+      const sucIds = [...new Set(result.rows.map(r => r.sucursal_id))];
+      const sucResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre FROM sucursales WHERE id = ANY($1)`, [sucIds]
+      );
+      const sucMap = {};
+      sucResult.rows.forEach(s => { sucMap[s.id] = s.nombre; });
+      result.rows.forEach(r => {
+        r.sucursal_nombre = sucMap[r.sucursal_id] || `Sucursal #${r.sucursal_id}`;
+      });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error consultando observaciones:', err.message);
+    res.status(500).json({ error: 'Error al consultar observaciones' });
+  }
+});
+
+// POST /api/observaciones - crear nueva observación con imágenes opcionales
+app.post('/api/observaciones', upload.array('imagenes', 10), async (req, res) => {
+  try {
+    const { sucursal_id, pilar_key, periodo, texto, criticidad, creado_por } = req.body;
+
+    if (!sucursal_id || !pilar_key || !periodo || !texto || !creado_por) {
+      return res.status(400).json({ error: 'sucursal_id, pilar_key, periodo, texto y creado_por son requeridos' });
+    }
+
+    // Procesar imágenes subidas
+    const imagenes = (req.files || []).map(file => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      url: `/api/uploads/${file.filename}`,
+      size: file.size
+    }));
+
+    const result = await poolMiSucursal.query(`
+      INSERT INTO observaciones_pilar
+        (sucursal_id, pilar_key, periodo, texto, criticidad, imagenes, creado_por, estado, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendiente', CURRENT_TIMESTAMP)
+      RETURNING *
+    `, [
+      sucursal_id, pilar_key, periodo, texto,
+      criticidad || 'media',
+      JSON.stringify(imagenes),
+      creado_por
+    ]);
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creando observación:', err.message);
+    res.status(500).json({ error: 'Error al crear observación' });
+  }
+});
+
+// PATCH /api/observaciones/:id/estado - auditor aprueba o desaprueba una observación
+app.patch('/api/observaciones/:id/estado', async (req, res) => {
+  const { id } = req.params;
+  const { estado, comentario_auditor } = req.body;
+
+  if (!estado || !['pendiente', 'aprobada', 'desaprobada'].includes(estado)) {
+    return res.status(400).json({ error: 'Estado debe ser "pendiente", "aprobada" o "desaprobada"' });
+  }
+
+  try {
+    const result = await poolMiSucursal.query(`
+      UPDATE observaciones_pilar
+      SET estado = $1,
+          comentario_auditor = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `, [estado, comentario_auditor || null, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Observación no encontrada' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error actualizando observación:', err.message);
+    res.status(500).json({ error: 'Error al actualizar observación' });
+  }
+});
+
+// DELETE /api/observaciones/:id - eliminar una observación
+app.delete('/api/observaciones/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get observation to delete its images
+    const obsResult = await poolMiSucursal.query(
+      `SELECT imagenes FROM observaciones_pilar WHERE id = $1`, [id]
+    );
+
+    if (obsResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Observación no encontrada' });
+    }
+
+    // Delete image files
+    const imagenes = obsResult.rows[0].imagenes || [];
+    imagenes.forEach(img => {
+      const filePath = path.join(UPLOADS_DIR, img.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    await poolMiSucursal.query(`DELETE FROM observaciones_pilar WHERE id = $1`, [id]);
+    res.json({ deleted: true, id: parseInt(id) });
+  } catch (err) {
+    console.error('Error eliminando observación:', err.message);
+    res.status(500).json({ error: 'Error al eliminar observación' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -417,7 +622,8 @@ app.get('/api/health', (req, res) => {
 
 const PORT = process.env.PORT || 3002;
 
-initDB().then(() => {
+initDB().then(async () => {
+  await initObservacionesTable();
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`API corriendo en puerto ${PORT}`);
   });

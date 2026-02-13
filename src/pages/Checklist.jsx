@@ -23,13 +23,26 @@ import {
   Users,
   Plus,
   Trash2,
-  FileCheck
+  FileCheck,
+  MessageSquare,
+  Send,
+  Image,
+  ThumbsUp,
+  ThumbsDown,
+  User,
+  LogIn
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 import { useNavigate } from 'react-router-dom';
 
 const Checklist = () => {
-  const { auditData, setAuditData, sucursalesNombres, sucursalesDB, tareasResumen, conteosStock, fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, updateAuditoresSucursal, getAuditoresSucursal, generateReport } = useAudit();
+  const {
+    auditData, setAuditData, sucursalesNombres, sucursalesDB, tareasResumen, conteosStock,
+    fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, updateAuditoresSucursal,
+    getAuditoresSucursal, generateReport,
+    observaciones, fetchObservaciones, createObservacion, updateObservacionEstado, deleteObservacion,
+    currentUser, setCurrentUser, isAuditor
+  } = useAudit();
   const navigate = useNavigate();
   const [tareasDetalle, setTareasDetalle] = useState([]);
   const [loadingTareas, setLoadingTareas] = useState(false);
@@ -38,6 +51,17 @@ const Checklist = () => {
   const [auditoresLocal, setAuditoresLocal] = useState(['']);
   const [generandoInforme, setGenerandoInforme] = useState(false);
   const [autoEvaluatedItems, setAutoEvaluatedItems] = useState({});
+
+  // Observaciones UI state
+  const [obsExpandedPilars, setObsExpandedPilars] = useState({});
+  const [obsTexto, setObsTexto] = useState({});
+  const [obsCriticidad, setObsCriticidad] = useState({});
+  const [obsImagenes, setObsImagenes] = useState({});
+  const [obsImagePreviews, setObsImagePreviews] = useState({});
+  const [obsSending, setObsSending] = useState({});
+  const [obsComentarioAuditor, setObsComentarioAuditor] = useState({});
+  // Login prompt
+  const [loginNombre, setLoginNombre] = useState('');
 
   // Umbral de aprobación automática de stock (valor absoluto en pesos)
   const STOCK_THRESHOLD = 150000;
@@ -482,6 +506,86 @@ const Checklist = () => {
     critica: { label: 'Crítica', color: 'text-red-500', bg: 'bg-red-500/20', border: 'border-red-500' }
   };
 
+  // ========== OBSERVACIONES ==========
+
+  // Fetch observaciones al cambiar sucursal o mes
+  useEffect(() => {
+    if (!selectedSucursal) return;
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
+    if (sucDB) {
+      fetchObservaciones(sucDB.id, null, mesKey);
+    }
+  }, [selectedSucursal, mesKey]);
+
+  // Observaciones filtradas por pilar
+  const getObservacionesPilar = (pilarKey) => {
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
+    if (!sucDB) return [];
+    return observaciones.filter(o => o.sucursal_id === sucDB.id && o.pilar_key === pilarKey && o.periodo === mesKey);
+  };
+
+  // Toggle expandir/colapsar sección de observaciones
+  const toggleObsExpanded = (pilarKey) => {
+    setObsExpandedPilars(prev => ({ ...prev, [pilarKey]: !prev[pilarKey] }));
+  };
+
+  // Enviar nueva observación
+  const handleEnviarObservacion = async (pilarKey) => {
+    const texto = obsTexto[pilarKey]?.trim();
+    if (!texto) return;
+
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
+    if (!sucDB || !currentUser) return;
+
+    setObsSending(prev => ({ ...prev, [pilarKey]: true }));
+
+    const imageFiles = obsImagenes[pilarKey] || [];
+    const criticidad = obsCriticidad[pilarKey] || 'media';
+
+    await createObservacion(sucDB.id, pilarKey, mesKey, texto, criticidad, currentUser.nombre, imageFiles);
+
+    // Limpiar form
+    setObsTexto(prev => ({ ...prev, [pilarKey]: '' }));
+    setObsCriticidad(prev => ({ ...prev, [pilarKey]: 'media' }));
+    // Limpiar imágenes y previews
+    (obsImagePreviews[pilarKey] || []).forEach(url => URL.revokeObjectURL(url));
+    setObsImagenes(prev => ({ ...prev, [pilarKey]: [] }));
+    setObsImagePreviews(prev => ({ ...prev, [pilarKey]: [] }));
+    setObsSending(prev => ({ ...prev, [pilarKey]: false }));
+  };
+
+  // Agregar imágenes a observación en progreso
+  const handleObsImageSelect = (pilarKey, e) => {
+    const files = Array.from(e.target.files);
+    const previews = files.map(f => URL.createObjectURL(f));
+    setObsImagenes(prev => ({ ...prev, [pilarKey]: [...(prev[pilarKey] || []), ...files] }));
+    setObsImagePreviews(prev => ({ ...prev, [pilarKey]: [...(prev[pilarKey] || []), ...previews] }));
+  };
+
+  // Remover imagen de observación en progreso
+  const handleObsImageRemove = (pilarKey, idx) => {
+    const previews = [...(obsImagePreviews[pilarKey] || [])];
+    URL.revokeObjectURL(previews[idx]);
+    previews.splice(idx, 1);
+    const files = [...(obsImagenes[pilarKey] || [])];
+    files.splice(idx, 1);
+    setObsImagenes(prev => ({ ...prev, [pilarKey]: files }));
+    setObsImagePreviews(prev => ({ ...prev, [pilarKey]: previews }));
+  };
+
+  // Aprobar/desaprobar observación (auditor)
+  const handleObsEstado = async (obsId, estado, pilarKey) => {
+    const comentario = obsComentarioAuditor[obsId] || null;
+    await updateObservacionEstado(obsId, estado, comentario);
+    setObsComentarioAuditor(prev => ({ ...prev, [obsId]: '' }));
+  };
+
+  const estadoObsConfig = {
+    pendiente: { label: 'Pendiente', color: 'text-mascotera-warning', bg: 'bg-mascotera-warning/20' },
+    aprobada: { label: 'Aprobada', color: 'text-mascotera-success', bg: 'bg-mascotera-success/20' },
+    desaprobada: { label: 'Desaprobada', color: 'text-mascotera-danger', bg: 'bg-mascotera-danger/20' }
+  };
+
   // Sincronizar auditores con context al cambiar sucursal
   useEffect(() => {
     if (selectedSucursal) {
@@ -612,6 +716,52 @@ const Checklist = () => {
     };
   };
 
+  // Si no hay usuario, mostrar login
+  if (!currentUser) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <div className="max-w-md mx-auto mt-20">
+          <div className="card-mascotera text-center">
+            <div className="w-16 h-16 rounded-full bg-mascotera-accent/20 flex items-center justify-center mx-auto mb-4">
+              <LogIn className="w-8 h-8 text-mascotera-accent" />
+            </div>
+            <h2 className="text-xl font-bold text-mascotera-text mb-2">Identificarse</h2>
+            <p className="text-sm text-mascotera-text-muted mb-6">
+              Ingresa tu nombre para acceder al sistema de auditoría
+            </p>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={loginNombre}
+                onChange={(e) => setLoginNombre(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && loginNombre.trim()) {
+                    setCurrentUser({ nombre: loginNombre.trim() });
+                  }
+                }}
+                placeholder="Tu nombre..."
+                className="input-mascotera w-full text-center"
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  if (loginNombre.trim()) {
+                    setCurrentUser({ nombre: loginNombre.trim() });
+                  }
+                }}
+                disabled={!loginNombre.trim()}
+                className={`btn-primary w-full flex items-center justify-center gap-2 ${!loginNombre.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <User className="w-4 h-4" />
+                Ingresar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
@@ -622,15 +772,24 @@ const Checklist = () => {
             Realiza auditorías y registra hallazgos por nivel de criticidad
           </p>
         </div>
-        {selectedSucursal && (
-          <button
-            onClick={exportarInforme}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <Download className="w-4 h-4" />
-            Exportar TXT
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-mascotera-card rounded-lg border border-mascotera-border">
+            <User className="w-4 h-4 text-mascotera-accent" />
+            <span className="text-sm text-mascotera-text font-medium">{currentUser.nombre}</span>
+            {isAuditor && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-mascotera-accent/20 text-mascotera-accent">AUDITOR</span>
+            )}
+          </div>
+          {selectedSucursal && (
+            <button
+              onClick={exportarInforme}
+              className="btn-secondary flex items-center gap-2 text-sm"
+            >
+              <Download className="w-4 h-4" />
+              Exportar TXT
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Selector de Sucursal y Calendario */}
@@ -703,7 +862,8 @@ const Checklist = () => {
             </p>
           </div>
 
-          {/* Card de Auditores */}
+          {/* Card de Auditores (solo auditor) */}
+          {isAuditor && (
           <div className="card-mascotera">
             <h3 className="text-lg font-semibold text-mascotera-text mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-mascotera-accent" />
@@ -739,6 +899,7 @@ const Checklist = () => {
               </button>
             </div>
           </div>
+          )}
 
           {/* Lista de Pilares */}
           {Object.entries(pilares).map(([pilarKey, pilar]) => {
@@ -766,6 +927,8 @@ const Checklist = () => {
                   )}
                 </div>
 
+                {/* Secciones de auditoría (solo auditor) */}
+                {isAuditor && (<>
                 {/* Dato Anexo - Orden y Limpieza */}
                 {pilarKey === 'ordenLimpieza' && (() => {
                   const tareasInfo = getTareasResumen();
@@ -1204,24 +1367,243 @@ const Checklist = () => {
                     )}
                   </div>
                 </div>
+                </>)}
 
-                {/* Observaciones */}
-                <div>
-                  <h5 className="text-sm font-semibold text-mascotera-text mb-3">Observaciones</h5>
-                  <textarea
-                    value={data.observaciones}
-                    onChange={(e) => updateObservaciones(pilarKey, e.target.value)}
-                    placeholder="Agrega observaciones o comentarios adicionales..."
-                    rows={3}
-                    className="input-mascotera w-full resize-none"
-                  />
+                {/* Notas del Auditor */}
+                {isAuditor && (
+                  <div className="mb-6">
+                    <h5 className="text-sm font-semibold text-mascotera-text mb-3">Notas del Auditor</h5>
+                    <textarea
+                      value={data.observaciones}
+                      onChange={(e) => updateObservaciones(pilarKey, e.target.value)}
+                      placeholder="Notas internas del auditor..."
+                      rows={3}
+                      className="input-mascotera w-full resize-none"
+                    />
+                  </div>
+                )}
+
+                {/* Observaciones Colaborativas */}
+                <div className="border-2 border-mascotera-border rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => toggleObsExpanded(pilarKey)}
+                    className="w-full flex items-center justify-between p-4 bg-mascotera-darker/50 hover:bg-mascotera-darker transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-mascotera-accent" />
+                      <h5 className="text-sm font-semibold text-mascotera-text">Observaciones</h5>
+                      {getObservacionesPilar(pilarKey).length > 0 && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-mascotera-accent/20 text-mascotera-accent">
+                          {getObservacionesPilar(pilarKey).length}
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-mascotera-text-muted transition-transform ${obsExpandedPilars[pilarKey] ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {obsExpandedPilars[pilarKey] && (
+                    <div className="p-4 space-y-4">
+                      {/* Formulario nueva observación */}
+                      <div className="bg-mascotera-darker/30 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <User className="w-4 h-4 text-mascotera-accent" />
+                          <span className="text-xs font-semibold text-mascotera-text">{currentUser?.nombre}</span>
+                          <span className="text-xs text-mascotera-text-muted">- Nueva observación</span>
+                        </div>
+                        <textarea
+                          value={obsTexto[pilarKey] || ''}
+                          onChange={(e) => setObsTexto(prev => ({ ...prev, [pilarKey]: e.target.value }))}
+                          placeholder="Escribe tu observación..."
+                          rows={2}
+                          className="input-mascotera w-full resize-none text-sm"
+                        />
+
+                        {/* Criticidad de la observación */}
+                        <div>
+                          <label className="text-xs text-mascotera-text-muted mb-1 block">Nivel de criticidad:</label>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {Object.entries(criticidadConfig).map(([key, config]) => (
+                              <button
+                                key={key}
+                                onClick={() => setObsCriticidad(prev => ({ ...prev, [pilarKey]: key }))}
+                                className={`p-1.5 rounded border text-xs font-semibold transition-all ${
+                                  (obsCriticidad[pilarKey] || 'media') === key
+                                    ? `${config.border} ${config.bg} ${config.color}`
+                                    : 'border-mascotera-border bg-mascotera-darker text-mascotera-text-muted'
+                                }`}
+                              >
+                                {config.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Imágenes opcionales */}
+                        <div>
+                          <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs text-mascotera-accent hover:text-mascotera-accent-light transition-colors">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) => handleObsImageSelect(pilarKey, e)}
+                              className="hidden"
+                            />
+                            <Image className="w-3.5 h-3.5" />
+                            Adjuntar imágenes (opcional)
+                          </label>
+                          {(obsImagePreviews[pilarKey] || []).length > 0 && (
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              {obsImagePreviews[pilarKey].map((preview, idx) => (
+                                <div key={idx} className="relative group">
+                                  <img src={preview} alt="" className="w-16 h-16 object-cover rounded border border-mascotera-border" />
+                                  <button
+                                    onClick={() => handleObsImageRemove(pilarKey, idx)}
+                                    className="absolute -top-1 -right-1 p-0.5 bg-mascotera-danger rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X className="w-2.5 h-2.5 text-white" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Botón enviar */}
+                        <button
+                          onClick={() => handleEnviarObservacion(pilarKey)}
+                          disabled={!(obsTexto[pilarKey]?.trim()) || obsSending[pilarKey]}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            obsTexto[pilarKey]?.trim() && !obsSending[pilarKey]
+                              ? 'bg-mascotera-accent text-mascotera-darker hover:bg-mascotera-accent-light'
+                              : 'bg-mascotera-border text-mascotera-text-muted cursor-not-allowed'
+                          }`}
+                        >
+                          <Send className="w-4 h-4" />
+                          {obsSending[pilarKey] ? 'Enviando...' : 'Enviar Observación'}
+                        </button>
+                      </div>
+
+                      {/* Lista de observaciones existentes */}
+                      {getObservacionesPilar(pilarKey).length > 0 ? (
+                        <div className="space-y-3">
+                          {getObservacionesPilar(pilarKey).map(obs => {
+                            const estadoConf = estadoObsConfig[obs.estado] || estadoObsConfig.pendiente;
+                            const obsImages = obs.imagenes || [];
+                            return (
+                              <div key={obs.id} className={`rounded-lg border p-4 ${
+                                obs.estado === 'aprobada' ? 'border-mascotera-success/30 bg-mascotera-success/5' :
+                                obs.estado === 'desaprobada' ? 'border-mascotera-danger/30 bg-mascotera-danger/5' :
+                                'border-mascotera-border bg-mascotera-darker/30'
+                              }`}>
+                                {/* Header */}
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-3.5 h-3.5 text-mascotera-accent" />
+                                    <span className="text-sm font-semibold text-mascotera-text">{obs.creado_por}</span>
+                                    <span className="text-[10px] text-mascotera-text-muted">
+                                      {new Date(obs.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${criticidadConfig[obs.criticidad]?.bg || 'bg-mascotera-warning/20'} ${criticidadConfig[obs.criticidad]?.color || 'text-mascotera-warning'}`}>
+                                      {criticidadConfig[obs.criticidad]?.label || obs.criticidad}
+                                    </span>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${estadoConf.bg} ${estadoConf.color}`}>
+                                      {estadoConf.label}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Texto */}
+                                <p className="text-sm text-mascotera-text mb-2">{obs.texto}</p>
+
+                                {/* Imágenes adjuntas */}
+                                {obsImages.length > 0 && (
+                                  <div className="flex gap-2 mb-3 flex-wrap">
+                                    {obsImages.map((img, imgIdx) => (
+                                      <a key={imgIdx} href={img.url} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                          src={img.url}
+                                          alt={img.originalname || `Imagen ${imgIdx + 1}`}
+                                          className="w-20 h-20 object-cover rounded border border-mascotera-border hover:border-mascotera-accent transition-colors"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Comentario del auditor */}
+                                {obs.comentario_auditor && (
+                                  <div className="bg-mascotera-darker/50 rounded p-2 mb-2">
+                                    <p className="text-[10px] font-bold text-mascotera-accent mb-0.5">Comentario del Auditor:</p>
+                                    <p className="text-xs text-mascotera-text">{obs.comentario_auditor}</p>
+                                  </div>
+                                )}
+
+                                {/* Controles del auditor */}
+                                {isAuditor && obs.estado === 'pendiente' && (
+                                  <div className="mt-3 pt-3 border-t border-mascotera-border/50 space-y-2">
+                                    <input
+                                      type="text"
+                                      value={obsComentarioAuditor[obs.id] || ''}
+                                      onChange={(e) => setObsComentarioAuditor(prev => ({ ...prev, [obs.id]: e.target.value }))}
+                                      placeholder="Comentario del auditor (opcional)..."
+                                      className="input-mascotera w-full text-xs"
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => handleObsEstado(obs.id, 'aprobada', pilarKey)}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-mascotera-success/20 text-mascotera-success hover:bg-mascotera-success/30 border border-mascotera-success/30 transition-all"
+                                      >
+                                        <ThumbsUp className="w-3.5 h-3.5" />
+                                        Aprobar
+                                      </button>
+                                      <button
+                                        onClick={() => handleObsEstado(obs.id, 'desaprobada', pilarKey)}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-mascotera-danger/20 text-mascotera-danger hover:bg-mascotera-danger/30 border border-mascotera-danger/30 transition-all"
+                                      >
+                                        <ThumbsDown className="w-3.5 h-3.5" />
+                                        Desaprobar
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Eliminar (solo el creador o auditor) */}
+                                {(isAuditor || obs.creado_por === currentUser?.nombre) && (
+                                  <div className="mt-2 flex justify-end">
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('¿Eliminar esta observación?')) {
+                                          deleteObservacion(obs.id);
+                                        }
+                                      }}
+                                      className="text-[10px] text-mascotera-text-muted hover:text-mascotera-danger transition-colors flex items-center gap-1"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <MessageSquare className="w-6 h-6 text-mascotera-text-muted mx-auto mb-1 opacity-40" />
+                          <p className="text-xs text-mascotera-text-muted">No hay observaciones para este pilar</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
 
-          {/* Botón Generar Informe */}
-          {allPilaresComplete() && (
+          {/* Botón Generar Informe (solo auditor) */}
+          {isAuditor && allPilaresComplete() && (
             <div className="card-mascotera border-mascotera-success/50 bg-mascotera-success/5">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-mascotera-success/20">

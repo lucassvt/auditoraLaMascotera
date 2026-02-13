@@ -11,6 +11,9 @@ export const useAudit = () => {
   return context;
 };
 
+// Nombre del auditor principal (tiene permisos de aprobar/desaprobar)
+const AUDITOR_NAMES = ['santiago'];
+
 export const AuditProvider = ({ children }) => {
   const [auditData, setAuditData] = useState({});
   const [sucursalesDB, setSucursalesDB] = useState([]);
@@ -19,6 +22,26 @@ export const AuditProvider = ({ children }) => {
   const [loadingDescargos, setLoadingDescargos] = useState(true);
   const [tareasResumen, setTareasResumen] = useState([]);
   const [conteosStock, setConteosStock] = useState([]);
+  const [observaciones, setObservaciones] = useState([]);
+  const [loadingObservaciones, setLoadingObservaciones] = useState(false);
+
+  // Usuario actual (persistido en localStorage)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('audit_current_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
+
+  // Persistir usuario actual
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('audit_current_user', JSON.stringify(currentUser));
+    }
+  }, [currentUser]);
+
+  // Verificar si el usuario actual es auditor
+  const isAuditor = currentUser && AUDITOR_NAMES.includes(currentUser.nombre.toLowerCase().trim());
 
   // Auditores por sucursal (persistido en localStorage)
   const [auditoresPorSucursal, setAuditoresPorSucursal] = useState(() => {
@@ -133,6 +156,88 @@ export const AuditProvider = ({ children }) => {
     fetchTareasResumen();
     fetchConteosStock();
   }, []);
+
+  // ========== OBSERVACIONES POR PILAR ==========
+
+  // Fetch observaciones (filtrable)
+  const fetchObservaciones = async (sucursalId, pilarKey, periodo) => {
+    setLoadingObservaciones(true);
+    try {
+      const params = new URLSearchParams();
+      if (sucursalId) params.append('sucursal_id', sucursalId);
+      if (pilarKey) params.append('pilar_key', pilarKey);
+      if (periodo) params.append('periodo', periodo);
+      const res = await fetch(`${API_BASE}/observaciones?${params.toString()}`);
+      const data = await res.json();
+      setObservaciones(Array.isArray(data) ? data : []);
+      setLoadingObservaciones(false);
+      return Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.error('Error cargando observaciones:', err);
+      setLoadingObservaciones(false);
+      return [];
+    }
+  };
+
+  // Crear nueva observación con imágenes opcionales
+  const createObservacion = async (sucursalId, pilarKey, periodo, texto, criticidad, creadorNombre, imageFiles = []) => {
+    try {
+      const formData = new FormData();
+      formData.append('sucursal_id', sucursalId);
+      formData.append('pilar_key', pilarKey);
+      formData.append('periodo', periodo);
+      formData.append('texto', texto);
+      formData.append('criticidad', criticidad || 'media');
+      formData.append('creado_por', creadorNombre);
+      imageFiles.forEach(file => {
+        formData.append('imagenes', file);
+      });
+
+      const res = await fetch(`${API_BASE}/observaciones`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) throw new Error('Error al crear observación');
+      const created = await res.json();
+      setObservaciones(prev => [created, ...prev]);
+      return created;
+    } catch (err) {
+      console.error('Error creando observación:', err);
+      return null;
+    }
+  };
+
+  // Auditor aprueba o desaprueba observación
+  const updateObservacionEstado = async (id, estado, comentarioAuditor = null) => {
+    try {
+      const res = await fetch(`${API_BASE}/observaciones/${id}/estado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado, comentario_auditor: comentarioAuditor })
+      });
+      if (!res.ok) throw new Error('Error al actualizar observación');
+      const updated = await res.json();
+      setObservaciones(prev => prev.map(o => o.id === id ? updated : o));
+      return updated;
+    } catch (err) {
+      console.error('Error actualizando observación:', err);
+      return null;
+    }
+  };
+
+  // Eliminar observación
+  const deleteObservacion = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/observaciones/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Error al eliminar observación');
+      setObservaciones(prev => prev.filter(o => o.id !== id));
+      return true;
+    } catch (err) {
+      console.error('Error eliminando observación:', err);
+      return false;
+    }
+  };
 
   // Obtener todos los hallazgos de las auditorías
   const getAllHallazgos = () => {
@@ -275,7 +380,18 @@ export const AuditProvider = ({ children }) => {
     generatedReports,
     generateReport,
     deleteReport,
-    getReportsByMes
+    getReportsByMes,
+    // Observaciones
+    observaciones,
+    loadingObservaciones,
+    fetchObservaciones,
+    createObservacion,
+    updateObservacionEstado,
+    deleteObservacion,
+    // Usuario
+    currentUser,
+    setCurrentUser,
+    isAuditor
   };
 
   return (
