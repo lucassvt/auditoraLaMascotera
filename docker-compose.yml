@@ -2,7 +2,7 @@ services:
   auditoria:
     build: .
     ports:
-      - "3001:80"
+      - "3010:80"
     depends_on:
       - api
     restart: unless-stopped
