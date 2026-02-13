@@ -12,7 +12,12 @@ export const useAudit = () => {
 };
 
 export const AuditProvider = ({ children }) => {
-  const [auditData, setAuditData] = useState({});
+  const [auditData, setAuditData] = useState(() => {
+    try {
+      const stored = localStorage.getItem('audit_pilares_data');
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  });
   const [sucursalesDB, setSucursalesDB] = useState([]);
   const [loadingSucursales, setLoadingSucursales] = useState(true);
   const [descargos, setDescargos] = useState([]);
@@ -98,6 +103,25 @@ export const AuditProvider = ({ children }) => {
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   });
+
+  // Persistir auditData (datos de pilares)
+  useEffect(() => {
+    // Filtrar imagenes (File objects) antes de guardar - solo guardar datos serializables
+    const dataToSave = {};
+    Object.entries(auditData).forEach(([suc, pilares]) => {
+      dataToSave[suc] = {};
+      Object.entries(pilares).forEach(([pilar, data]) => {
+        dataToSave[suc][pilar] = {
+          ...data,
+          imagenes: (data.imagenes || []).map(img => ({
+            name: img.name,
+            preview: img.preview || null
+          }))
+        };
+      });
+    });
+    localStorage.setItem('audit_pilares_data', JSON.stringify(dataToSave));
+  }, [auditData]);
 
   // Persistir auditoresPorSucursal
   useEffect(() => {

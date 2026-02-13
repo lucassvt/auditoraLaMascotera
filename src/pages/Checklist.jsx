@@ -216,7 +216,7 @@ const Checklist = () => {
         items: pilar.items.map(() => null), // null = sin evaluar, true = cumple, false = no cumple
         imagenes: [],
         observaciones: '',
-        criticidad: 'media', // baja, media, alta, critica
+        criticidad: null, // baja, media, alta, critica (obligatorio)
         tieneHallazgo: false,
         fecha: new Date().toISOString()
       };
@@ -549,14 +549,17 @@ const Checklist = () => {
     if (selectedSucursal) updateAuditoresSucursal(selectedSucursal, updated.filter(a => a.trim()));
   };
 
-  // Verificar si todos los pilares tienen estado definido (no null)
+  // Verificar si un pilar individual está completo (estado + criticidad definidos)
+  const isPilarComplete = (pilarKey) => {
+    const data = auditData[selectedSucursal]?.[pilarKey];
+    return data && data.estado !== null && data.criticidad !== null;
+  };
+
+  // Verificar si todos los pilares tienen estado y criticidad definidos
   const allPilaresComplete = () => {
     if (!selectedSucursal || !auditData[selectedSucursal]) return false;
     const pilaresKeys = Object.keys(getPilares());
-    return pilaresKeys.every(key => {
-      const data = auditData[selectedSucursal]?.[key];
-      return data && data.estado !== null;
-    });
+    return pilaresKeys.every(key => isPilarComplete(key));
   };
 
   // Calcular resumen para el informe
@@ -855,6 +858,30 @@ const Checklist = () => {
           </div>
           )}
 
+          {/* Progreso de Pilares */}
+          {(() => {
+            const pilaresKeys = Object.keys(pilares);
+            const completados = pilaresKeys.filter(k => isPilarComplete(k)).length;
+            const total = pilaresKeys.length;
+            return (
+              <div className="card-mascotera">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-mascotera-text">Progreso de evaluación</span>
+                  <span className="text-sm font-bold text-mascotera-accent">{completados}/{total} pilares completos</span>
+                </div>
+                <div className="h-2.5 bg-mascotera-darker rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-mascotera-accent to-yellow-400 rounded-full transition-all duration-500"
+                    style={{ width: `${total > 0 ? (completados / total) * 100 : 0}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-mascotera-text-muted mt-2">
+                  Los datos se guardan automáticamente. Cada pilar requiere estado y criticidad para estar completo.
+                </p>
+              </div>
+            );
+          })()}
+
           {/* Lista de Pilares */}
           {Object.entries(pilares).map(([pilarKey, pilar]) => {
             const Icon = pilar.icon;
@@ -871,14 +898,27 @@ const Checklist = () => {
                     <h4 className="text-xl font-semibold text-mascotera-text">{pilar.nombre}</h4>
                     <p className="text-sm text-mascotera-text-muted mt-1">{pilar.items.length} items de verificación</p>
                   </div>
-                  {data.tieneHallazgo && (
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className={`w-5 h-5 ${criticidadConfig[data.criticidad].color}`} />
-                      <span className={`text-sm font-semibold ${criticidadConfig[data.criticidad].color}`}>
-                        Hallazgo {criticidadConfig[data.criticidad].label}
+                  <div className="flex items-center gap-2">
+                    {isPilarComplete(pilarKey) ? (
+                      <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-mascotera-success/20 text-mascotera-success">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Guardado
                       </span>
-                    </div>
-                  )}
+                    ) : data.estado !== null || data.criticidad !== null ? (
+                      <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-mascotera-warning/20 text-mascotera-warning">
+                        <Clock className="w-3.5 h-3.5" />
+                        Incompleto
+                      </span>
+                    ) : null}
+                    {data.tieneHallazgo && data.criticidad && (
+                      <>
+                        <AlertTriangle className={`w-5 h-5 ${criticidadConfig[data.criticidad].color}`} />
+                        <span className={`text-sm font-semibold ${criticidadConfig[data.criticidad].color}`}>
+                          Hallazgo {criticidadConfig[data.criticidad].label}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Secciones de auditoría (solo auditor) */}
@@ -1112,11 +1152,11 @@ const Checklist = () => {
                   </div>
                 </div>
 
-                {/* Nivel de Criticidad */}
+                {/* Nivel de Criticidad (OBLIGATORIO) */}
                 <div className="mb-6">
                   <h5 className="text-sm font-semibold text-mascotera-text mb-3 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-mascotera-warning" />
-                    Nivel de Criticidad del Pilar
+                    Nivel de Criticidad del Pilar <span className="text-mascotera-danger">*</span>
                   </h5>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {Object.entries(criticidadConfig).map(([key, config]) => (
@@ -1133,7 +1173,13 @@ const Checklist = () => {
                       </button>
                     ))}
                   </div>
-                  {data.estado === false && (
+                  {!data.criticidad && (
+                    <p className="text-xs text-mascotera-danger mt-2 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      Debe seleccionar un nivel de criticidad para este pilar
+                    </p>
+                  )}
+                  {data.estado === false && data.criticidad && (
                     <p className="text-xs text-mascotera-text-muted mt-2">
                       Este pilar generará un hallazgo con nivel de criticidad: <span className={`font-semibold ${criticidadConfig[data.criticidad].color}`}>{criticidadConfig[data.criticidad].label}</span>
                     </p>
