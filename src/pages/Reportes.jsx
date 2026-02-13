@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Search,
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../config';
 
 const Reportes = () => {
   const { getAllHallazgos, sucursalesNombres, generatedReports, getReportsByMes, deleteReport } = useAudit();
@@ -50,6 +51,9 @@ const Reportes = () => {
     fechaLimite: '',
     imagenes: []
   });
+
+  // Observaciones de DB para hallazgos
+  const [observacionesDB, setObservacionesDB] = useState([]);
 
   const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const [selectedMonth, setSelectedMonth] = useState(0); // Enero
@@ -75,6 +79,17 @@ const Reportes = () => {
 
   const mesKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
+  // Fetch observaciones de DB para el período seleccionado
+  useEffect(() => {
+    fetch(`${API_BASE}/observaciones?periodo=${mesKey}`)
+      .then(res => res.json())
+      .then(data => setObservacionesDB(Array.isArray(data) ? data : []))
+      .catch(err => {
+        console.error('Error cargando observaciones para hallazgos:', err);
+        setObservacionesDB([]);
+      });
+  }, [mesKey]);
+
   // Hallazgos manuales (sin datos mock - se gestionaran desde el backend)
   const hallazgosManuales = [];
 
@@ -83,7 +98,7 @@ const Reportes = () => {
 
   const tipoConfig = {
     'no_conformidad': { label: 'No Conformidad', icon: AlertTriangle, color: 'text-mascotera-danger', bg: 'bg-mascotera-danger/10' },
-    'observacion': { label: 'Observación', icon: Info, color: 'text-mascotera-warning', bg: 'bg-mascotera-warning/10' },
+    'observacion': { label: 'Observación', icon: MessageSquare, color: 'text-mascotera-warning', bg: 'bg-mascotera-warning/10' },
     'buena_practica': { label: 'Buena Práctica', icon: CheckCircle2, color: 'text-mascotera-success', bg: 'bg-mascotera-success/10' }
   };
 
@@ -109,7 +124,7 @@ const Reportes = () => {
     'critica': 'critica'
   };
 
-  // Obtener hallazgos de auditorías
+  // Obtener hallazgos de auditorías (pilar-level: NO APROBADO)
   const auditHallazgos = getAllHallazgos().map(h => ({
     id: h.id,
     titulo: `${h.pilar} - Hallazgo de Auditoría`,
@@ -130,8 +145,35 @@ const Reportes = () => {
     criticidadOriginal: h.criticidad
   }));
 
-  // Combinar hallazgos manuales con hallazgos de auditoría
-  const todosHallazgos = [...hallazgos, ...auditHallazgos];
+  // Obtener hallazgos de observaciones de DB (cada observación es un hallazgo individual)
+  const observacionesHallazgos = observacionesDB.map(obs => {
+    const sucNombre = obs.sucursal_nombre ? obs.sucursal_nombre.replace(/^SUCURSAL\s+/i, '') : `Sucursal #${obs.sucursal_id}`;
+    const pilarNombre = pilaresNombres[obs.pilar_key] || obs.pilar_key;
+    const obsImages = obs.imagenes || [];
+    return {
+      id: `OBS-${obs.id}`,
+      titulo: `${pilarNombre} - Observación`,
+      descripcion: obs.texto,
+      tipo: 'observacion',
+      severidad: criticidadToSeveridad[obs.criticidad] || 'media',
+      categoria: 'observacion_pilar',
+      auditoria: `OBS-${obs.periodo}-${sucNombre}`,
+      area: sucNombre,
+      auditor: obs.creado_por || 'Sistema',
+      fechaDeteccion: new Date(obs.created_at).toLocaleDateString('es-AR'),
+      fechaLimite: null,
+      estado: obs.estado === 'aprobada' ? 'cerrado' : obs.estado === 'desaprobada' ? 'abierto' : 'en_proceso',
+      acciones: 0,
+      comentarios: obs.comentario_auditor ? 1 : 0,
+      evidencias: obsImages.length,
+      tieneImagenes: obsImages.length > 0,
+      criticidadOriginal: obs.criticidad,
+      esObservacionDB: true
+    };
+  });
+
+  // Combinar hallazgos manuales + pilar-level + observaciones DB
+  const todosHallazgos = [...hallazgos, ...auditHallazgos, ...observacionesHallazgos];
 
   const filteredHallazgos = filterType === 'todos'
     ? todosHallazgos
@@ -139,11 +181,11 @@ const Reportes = () => {
 
   const stats = [
     { label: 'Total Hallazgos', value: todosHallazgos.length, color: 'text-mascotera-text' },
-    { label: 'Hallazgos Críticos', value: todosHallazgos.filter(h => h.severidad === 'alta').length, color: 'text-mascotera-danger' },
+    { label: 'Críticos / Altos', value: todosHallazgos.filter(h => h.severidad === 'alta' || h.severidad === 'critica').length, color: 'text-mascotera-danger' },
     { label: 'De Auditorías', value: auditHallazgos.length, color: 'text-mascotera-accent' },
-    { label: 'Orden y Limpieza', value: todosHallazgos.filter(h => h.categoria === 'orden_limpieza').length, color: 'text-mascotera-warning' },
-    { label: 'Stock y Caja', value: todosHallazgos.filter(h => h.categoria === 'stock' || h.categoria === 'caja').length, color: 'text-mascotera-accent' },
-    { label: 'Acciones Graves', value: todosHallazgos.filter(h => h.categoria === 'accion_grave').length, color: 'text-mascotera-danger' },
+    { label: 'Observaciones', value: observacionesHallazgos.length, color: 'text-mascotera-warning' },
+    { label: 'Abiertos', value: todosHallazgos.filter(h => h.estado === 'abierto').length, color: 'text-mascotera-danger' },
+    { label: 'Cerrados', value: todosHallazgos.filter(h => h.estado === 'cerrado').length, color: 'text-mascotera-success' },
   ];
 
   const openDetail = (hallazgo) => {
@@ -434,6 +476,17 @@ const Reportes = () => {
               <AlertTriangle className="w-4 h-4" />
               No Conformidades
             </button>
+            <button
+              onClick={() => setFilterType('observacion')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                filterType === 'observacion'
+                  ? 'bg-mascotera-warning/20 text-mascotera-warning font-semibold'
+                  : 'bg-mascotera-darker text-mascotera-text-muted hover:text-mascotera-text'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Observaciones
+            </button>
           </div>
         </div>
       </div>
@@ -441,7 +494,10 @@ const Reportes = () => {
       {/* Hallazgos List */}
       <div className="space-y-4">
         {filteredHallazgos.map((hallazgo) => {
-          const TipoIcon = tipoConfig[hallazgo.tipo].icon;
+          const tipoConf = tipoConfig[hallazgo.tipo] || tipoConfig['no_conformidad'];
+          const TipoIcon = tipoConf.icon;
+          const estadoConf = estadoConfig[hallazgo.estado] || estadoConfig['abierto'];
+          const sevConf = severidadConfig[hallazgo.severidad] || severidadConfig['media'];
 
           return (
             <div
@@ -451,8 +507,8 @@ const Reportes = () => {
             >
               <div className="flex items-start gap-4">
                 {/* Icon */}
-                <div className={`p-3 rounded-lg ${tipoConfig[hallazgo.tipo].bg} flex-shrink-0`}>
-                  <TipoIcon className={`w-6 h-6 ${tipoConfig[hallazgo.tipo].color}`} />
+                <div className={`p-3 rounded-lg ${tipoConf.bg} flex-shrink-0`}>
+                  <TipoIcon className={`w-6 h-6 ${tipoConf.color}`} />
                 </div>
 
                 {/* Content */}
@@ -461,11 +517,11 @@ const Reportes = () => {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm text-mascotera-accent">{hallazgo.id}</span>
-                        <span className={`badge ${estadoConfig[hallazgo.estado].badge}`}>
-                          {estadoConfig[hallazgo.estado].label}
+                        <span className={`badge ${estadoConf.badge}`}>
+                          {estadoConf.label}
                         </span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${severidadConfig[hallazgo.severidad].bg} ${severidadConfig[hallazgo.severidad].color}`}>
-                          {severidadConfig[hallazgo.severidad].label}
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${sevConf.bg} ${sevConf.color}`}>
+                          {sevConf.label}
                         </span>
                         {hallazgo.criticidadOriginal === 'critica' && (
                           <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-500 border border-red-500 animate-pulse">
@@ -475,6 +531,11 @@ const Reportes = () => {
                         {hallazgo.categoria === 'auditoria' && (
                           <span className="px-2 py-0.5 rounded text-xs font-semibold bg-mascotera-accent/20 text-mascotera-accent">
                             Auditoría
+                          </span>
+                        )}
+                        {hallazgo.categoria === 'observacion_pilar' && (
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-mascotera-warning/20 text-mascotera-warning">
+                            Observación
                           </span>
                         )}
                       </div>
@@ -520,6 +581,15 @@ const Reportes = () => {
             </div>
           );
         })}
+        {filteredHallazgos.length === 0 && (
+          <div className="card-mascotera text-center py-12">
+            <AlertTriangle className="w-12 h-12 text-mascotera-text-muted mx-auto mb-3 opacity-40" />
+            <h3 className="text-lg font-semibold text-mascotera-text mb-1">No hay hallazgos</h3>
+            <p className="text-sm text-mascotera-text-muted">
+              No se encontraron hallazgos ni observaciones para este período.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Modal de Detalle */}
@@ -531,8 +601,8 @@ const Reportes = () => {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-mono text-sm text-mascotera-accent">{selectedHallazgo.id}</span>
-                  <span className={`badge ${estadoConfig[selectedHallazgo.estado].badge}`}>
-                    {estadoConfig[selectedHallazgo.estado].label}
+                  <span className={`badge ${(estadoConfig[selectedHallazgo.estado] || estadoConfig['abierto']).badge}`}>
+                    {(estadoConfig[selectedHallazgo.estado] || estadoConfig['abierto']).label}
                   </span>
                 </div>
                 <h2 className="text-xl font-semibold text-mascotera-text">{selectedHallazgo.titulo}</h2>
@@ -551,14 +621,14 @@ const Reportes = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-mascotera-darker rounded-lg">
                   <p className="text-xs text-mascotera-text-muted mb-1">Tipo</p>
-                  <p className={`font-semibold ${tipoConfig[selectedHallazgo.tipo].color}`}>
-                    {tipoConfig[selectedHallazgo.tipo].label}
+                  <p className={`font-semibold ${(tipoConfig[selectedHallazgo.tipo] || tipoConfig['no_conformidad']).color}`}>
+                    {(tipoConfig[selectedHallazgo.tipo] || tipoConfig['no_conformidad']).label}
                   </p>
                 </div>
                 <div className="p-4 bg-mascotera-darker rounded-lg">
                   <p className="text-xs text-mascotera-text-muted mb-1">Severidad</p>
-                  <p className={`font-semibold ${severidadConfig[selectedHallazgo.severidad].color}`}>
-                    {severidadConfig[selectedHallazgo.severidad].label}
+                  <p className={`font-semibold ${(severidadConfig[selectedHallazgo.severidad] || severidadConfig['media']).color}`}>
+                    {(severidadConfig[selectedHallazgo.severidad] || severidadConfig['media']).label}
                   </p>
                 </div>
                 <div className="p-4 bg-mascotera-darker rounded-lg">
