@@ -21,6 +21,7 @@ export const AuditProvider = ({ children }) => {
   const [conteosStock, setConteosStock] = useState([]);
   const [observaciones, setObservaciones] = useState([]);
   const [loadingObservaciones, setLoadingObservaciones] = useState(false);
+  const [conteosPendientes, setConteosPendientes] = useState([]);
 
   // Usuario actual (persistido en localStorage)
   // Estructura: { id, nombre, apellido, usuario, rol, puesto, sucursal_id, accessLevel }
@@ -191,9 +192,38 @@ export const AuditProvider = ({ children }) => {
       .catch(err => console.error('Error cargando conteos:', err));
   };
 
+  // Fetch conteos pendientes de revisión (para notificaciones)
+  const fetchConteosPendientes = () => {
+    fetch(`${API_BASE}/conteos-stock/pendientes`)
+      .then(res => res.json())
+      .then(data => setConteosPendientes(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error cargando conteos pendientes:', err));
+  };
+
+  // Ajustar conteo de stock (marcar como revisado por auditor)
+  const ajustarConteoStock = async (conteoId, comentarios = null) => {
+    try {
+      const response = await fetch(`${API_BASE}/conteos-stock/${conteoId}/ajustar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          revisado_por: currentUser?.id || null,
+          comentarios_auditor: comentarios
+        })
+      });
+      if (!response.ok) throw new Error('Error al ajustar conteo');
+      await fetchConteosPendientes();
+      return true;
+    } catch (err) {
+      console.error('Error ajustando conteo:', err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchTareasResumen();
     fetchConteosStock();
+    fetchConteosPendientes();
   }, []);
 
   // ========== OBSERVACIONES POR PILAR ==========
@@ -455,6 +485,9 @@ export const AuditProvider = ({ children }) => {
     fetchTareasResumen,
     fetchTareasSucursal,
     fetchConteosStock,
+    conteosPendientes,
+    fetchConteosPendientes,
+    ajustarConteoStock,
     auditoresPorSucursal,
     updateAuditoresSucursal,
     getAuditoresSucursal,

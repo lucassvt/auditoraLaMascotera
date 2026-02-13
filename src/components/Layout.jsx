@@ -20,7 +20,8 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  Shield
+  Shield,
+  Package
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 
@@ -45,7 +46,7 @@ const Layout = ({ children }) => {
   const notifRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { descargos, currentUser, loginUser, logoutUser, userDisplayName, isAuditor, isPilaresOnly } = useAudit();
+  const { descargos, conteosPendientes, currentUser, loginUser, logoutUser, userDisplayName, isAuditor, isPilaresOnly } = useAudit();
 
   // Login form state
   const [loginUsuario, setLoginUsuario] = useState('');
@@ -55,6 +56,7 @@ const Layout = ({ children }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const descargosPendientes = descargos.filter(d => d.estado === 'pendiente');
+  const totalNotificaciones = descargosPendientes.length + conteosPendientes.length;
 
   // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
@@ -360,9 +362,9 @@ const Layout = ({ children }) => {
                 className="relative p-2 text-mascotera-text-muted hover:text-mascotera-accent transition-colors"
               >
                 <Bell className="w-5 h-5" />
-                {descargosPendientes.length > 0 && (
+                {totalNotificaciones > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-mascotera-danger text-white text-[10px] font-bold rounded-full px-1">
-                    {descargosPendientes.length > 99 ? '99+' : descargosPendientes.length}
+                    {totalNotificaciones > 99 ? '99+' : totalNotificaciones}
                   </span>
                 )}
               </button>
@@ -372,56 +374,108 @@ const Layout = ({ children }) => {
                 <div className="absolute right-0 top-full mt-2 w-96 bg-mascotera-card border border-mascotera-border rounded-xl shadow-2xl z-50 overflow-hidden">
                   <div className="bg-mascotera-darker px-4 py-3 border-b border-mascotera-border flex items-center justify-between">
                     <h3 className="font-semibold text-mascotera-text text-sm">Notificaciones</h3>
-                    {descargosPendientes.length > 0 && (
+                    {totalNotificaciones > 0 && (
                       <span className="bg-mascotera-danger/20 text-mascotera-danger text-xs font-semibold px-2 py-0.5 rounded-full">
-                        {descargosPendientes.length} pendiente{descargosPendientes.length !== 1 ? 's' : ''}
+                        {totalNotificaciones} pendiente{totalNotificaciones !== 1 ? 's' : ''}
                       </span>
                     )}
                   </div>
 
-                  <div className="max-h-80 overflow-y-auto">
-                    {descargosPendientes.length === 0 ? (
+                  <div className="max-h-96 overflow-y-auto">
+                    {totalNotificaciones === 0 ? (
                       <div className="py-8 text-center">
                         <Bell className="w-8 h-8 text-mascotera-text-muted mx-auto mb-2 opacity-40" />
                         <p className="text-sm text-mascotera-text-muted">No hay notificaciones pendientes</p>
                       </div>
                     ) : (
-                      descargosPendientes
-                        .sort((a, b) => new Date(b.fecha_descargo) - new Date(a.fecha_descargo))
-                        .slice(0, 10)
-                        .map(descargo => {
-                          const sucNombre = descargo.sucursal_nombre
-                            ? descargo.sucursal_nombre.replace(/^SUCURSAL\s+/i, '')
-                            : `Sucursal #${descargo.sucursal_id}`;
-                          return (
-                            <button
-                              key={descargo.id}
-                              onClick={() => {
-                                setNotifOpen(false);
-                                navigate('/auditorias', { state: { openDescargos: true } });
-                              }}
-                              className="w-full text-left px-4 py-3 hover:bg-mascotera-darker/50 transition-colors border-b border-mascotera-border/30 last:border-b-0"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-mascotera-warning/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                  <MessageSquare className="w-4 h-4 text-mascotera-warning" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="text-sm font-semibold text-mascotera-text truncate">{descargo.titulo}</p>
-                                    <span className="text-[10px] text-mascotera-text-muted whitespace-nowrap">{formatTimeAgo(descargo.fecha_descargo)}</span>
+                      <>
+                        {/* Conteos de stock pendientes */}
+                        {conteosPendientes.length > 0 && (
+                          <>
+                            <div className="px-4 py-2 bg-mascotera-accent/5 border-b border-mascotera-border/30">
+                              <p className="text-[10px] font-bold text-mascotera-accent uppercase tracking-wider">Control de Stock</p>
+                            </div>
+                            {conteosPendientes.slice(0, 5).map(conteo => {
+                              const sucNombre = conteo.sucursal_nombre
+                                ? conteo.sucursal_nombre.replace(/^SUCURSAL\s+/i, '')
+                                : `Sucursal #${conteo.sucursal_id}`;
+                              const dif = parseFloat(conteo.valorizacion_diferencia) || 0;
+                              return (
+                                <button
+                                  key={`conteo-${conteo.id}`}
+                                  onClick={() => {
+                                    setNotifOpen(false);
+                                    navigate('/auditorias', { state: { openConteos: true } });
+                                  }}
+                                  className="w-full text-left px-4 py-3 hover:bg-mascotera-darker/50 transition-colors border-b border-mascotera-border/30"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-mascotera-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                      <Package className="w-4 h-4 text-mascotera-accent" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold text-mascotera-text truncate">Conteo de Stock Finalizado</p>
+                                        <span className="text-[10px] text-mascotera-text-muted whitespace-nowrap">{formatTimeAgo(conteo.created_at)}</span>
+                                      </div>
+                                      <p className="text-xs text-mascotera-text-muted mt-0.5">
+                                        {conteo.productos_contados} productos · Diferencia: <span className={dif < 0 ? 'text-mascotera-danger' : 'text-mascotera-success'}>${Math.abs(dif).toLocaleString('es-AR')}</span>
+                                      </p>
+                                      <p className="text-[10px] text-mascotera-accent mt-1">{sucNombre} · {conteo.empleado_nombre}</p>
+                                    </div>
                                   </div>
-                                  <p className="text-xs text-mascotera-text-muted truncate mt-0.5">{descargo.descripcion}</p>
-                                  <p className="text-[10px] text-mascotera-accent mt-1">{sucNombre}</p>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })
+                                </button>
+                              );
+                            })}
+                          </>
+                        )}
+
+                        {/* Descargos pendientes */}
+                        {descargosPendientes.length > 0 && (
+                          <>
+                            <div className="px-4 py-2 bg-mascotera-warning/5 border-b border-mascotera-border/30">
+                              <p className="text-[10px] font-bold text-mascotera-warning uppercase tracking-wider">Descargos</p>
+                            </div>
+                            {descargosPendientes
+                              .sort((a, b) => new Date(b.fecha_descargo) - new Date(a.fecha_descargo))
+                              .slice(0, 5)
+                              .map(descargo => {
+                                const sucNombre = descargo.sucursal_nombre
+                                  ? descargo.sucursal_nombre.replace(/^SUCURSAL\s+/i, '')
+                                  : `Sucursal #${descargo.sucursal_id}`;
+                                return (
+                                  <button
+                                    key={`descargo-${descargo.id}`}
+                                    onClick={() => {
+                                      setNotifOpen(false);
+                                      navigate('/auditorias', { state: { openDescargos: true } });
+                                    }}
+                                    className="w-full text-left px-4 py-3 hover:bg-mascotera-darker/50 transition-colors border-b border-mascotera-border/30 last:border-b-0"
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-8 h-8 rounded-lg bg-mascotera-warning/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <MessageSquare className="w-4 h-4 text-mascotera-warning" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p className="text-sm font-semibold text-mascotera-text truncate">{descargo.titulo}</p>
+                                          <span className="text-[10px] text-mascotera-text-muted whitespace-nowrap">{formatTimeAgo(descargo.fecha_descargo)}</span>
+                                        </div>
+                                        <p className="text-xs text-mascotera-text-muted truncate mt-0.5">{descargo.descripcion}</p>
+                                        <p className="text-[10px] text-mascotera-accent mt-1">{sucNombre}</p>
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            }
+                          </>
+                        )}
+                      </>
                     )}
                   </div>
 
-                  {descargosPendientes.length > 0 && (
+                  {totalNotificaciones > 0 && (
                     <button
                       onClick={() => {
                         setNotifOpen(false);
@@ -429,7 +483,7 @@ const Layout = ({ children }) => {
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-mascotera-darker/50 border-t border-mascotera-border text-sm text-mascotera-accent hover:bg-mascotera-darker transition-colors"
                     >
-                      Ver todos los descargos
+                      Ver todo
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   )}

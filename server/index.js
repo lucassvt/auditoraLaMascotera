@@ -324,6 +324,98 @@ app.get('/api/conteos-stock', async (req, res) => {
   }
 });
 
+// GET /api/conteos-stock/pendientes - conteos finalizados sin revisar por auditor
+app.get('/api/conteos-stock/pendientes', async (req, res) => {
+  try {
+    const result = await poolMiSucursal.query(`
+      SELECT c.id, c.tarea_id, c.sucursal_id, c.empleado_id, c.estado,
+             c.fecha_conteo, c.valorizacion_diferencia, c.total_productos,
+             c.productos_contados, c.productos_con_diferencia, c.created_at
+      FROM conteos_stock c
+      WHERE c.estado = 'finalizado' AND c.revisado_por IS NULL
+      ORDER BY c.created_at DESC
+    `);
+
+    // Enrich with sucursal names
+    if (result.rows.length > 0) {
+      const sucIds = [...new Set(result.rows.map(r => r.sucursal_id))];
+      const sucResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre FROM sucursales WHERE id = ANY($1)`, [sucIds]
+      );
+      const sucMap = {};
+      sucResult.rows.forEach(s => { sucMap[s.id] = s.nombre; });
+
+      // Enrich with employee names
+      const empIds = [...new Set(result.rows.map(r => r.empleado_id))];
+      const empResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre, apellido FROM employees WHERE id = ANY($1)`, [empIds]
+      );
+      const empMap = {};
+      empResult.rows.forEach(e => { empMap[e.id] = `${e.nombre} ${e.apellido}`; });
+
+      result.rows.forEach(r => {
+        r.sucursal_nombre = sucMap[r.sucursal_id] || `Sucursal #${r.sucursal_id}`;
+        r.empleado_nombre = empMap[r.empleado_id] || `Empleado #${r.empleado_id}`;
+      });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error consultando conteos pendientes:', err.message);
+    res.status(500).json({ error: 'Error al consultar conteos pendientes' });
+  }
+});
+
+// PATCH /api/conteos-stock/:id/ajustar - marcar conteo como ajustado por auditor
+app.patch('/api/conteos-stock/:id/ajustar', async (req, res) => {
+  const { id } = req.params;
+  const { revisado_por, comentarios_auditor } = req.body;
+
+  try {
+    // Obtener el conteo para saber su tarea_id
+    const conteoResult = await poolMiSucursal.query(
+      `SELECT id, tarea_id, sucursal_id FROM conteos_stock WHERE id = $1`, [id]
+    );
+
+    if (conteoResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Conteo no encontrado' });
+    }
+
+    const conteo = conteoResult.rows[0];
+
+    // Marcar conteo como revisado
+    await poolMiSucursal.query(`
+      UPDATE conteos_stock
+      SET revisado_por = $1,
+          fecha_revision = CURRENT_TIMESTAMP,
+          comentarios_auditor = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+    `, [revisado_por || null, comentarios_auditor || null, id]);
+
+    // Completar la tarea asociada en tareas_sucursal (dux_integrada)
+    if (conteo.tarea_id) {
+      try {
+        await poolDuxIntegrada.query(`
+          UPDATE tareas_sucursal
+          SET estado = 'completada',
+              completado_por = $1,
+              fecha_completado = CURRENT_TIMESTAMP
+          WHERE id = $2 AND estado != 'completada'
+        `, [revisado_por || null, conteo.tarea_id]);
+      } catch (tareaErr) {
+        console.error('Error completando tarea asociada:', tareaErr.message);
+        // No fallar la operación principal si la tarea no se puede completar
+      }
+    }
+
+    res.json({ success: true, conteo_id: parseInt(id), tarea_id: conteo.tarea_id });
+  } catch (err) {
+    console.error('Error ajustando conteo:', err.message);
+    res.status(500).json({ error: 'Error al ajustar conteo de stock' });
+  }
+});
+
 // POST /api/informes - guardar informe de auditoría en la base de datos
 app.post('/api/informes', async (req, res) => {
   const {

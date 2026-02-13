@@ -10,26 +10,35 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
-  MessageSquare
+  MessageSquare,
+  Package,
+  Check
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 import DescargosSection from '../components/DescargosSection';
 
 const Auditorias = () => {
   const routeLocation = useLocation();
-  const { sucursalesNombres, sucursalesDB, tareasResumen, conteosStock, fetchTareasResumen, fetchTareasSucursal, fetchConteosStock } = useAudit();
+  const { sucursalesNombres, sucursalesDB, tareasResumen, conteosStock, fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, conteosPendientes, fetchConteosPendientes, ajustarConteoStock, currentUser } = useAudit();
   const [selectedPilarDetail, setSelectedPilarDetail] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('auditorias');
 
-  // Abrir pestaña descargos si se navega desde notificaciones
+  // Abrir pestaña correspondiente si se navega desde notificaciones
   useEffect(() => {
     if (routeLocation.state?.openDescargos) {
       setActiveTab('descargos');
-      // Limpiar el state para que no se reabra al volver
+      window.history.replaceState({}, document.title);
+    } else if (routeLocation.state?.openConteos) {
+      setActiveTab('conteos');
       window.history.replaceState({}, document.title);
     }
   }, [routeLocation.state]);
+
+  const [ajustandoId, setAjustandoId] = useState(null);
+  const [comentarioAjuste, setComentarioAjuste] = useState('');
+  const [ajusteModalOpen, setAjusteModalOpen] = useState(false);
+  const [selectedConteo, setSelectedConteo] = useState(null);
   const [tareasDetalle, setTareasDetalle] = useState([]);
   const [loadingTareas, setLoadingTareas] = useState(false);
 
@@ -177,9 +186,181 @@ const Auditorias = () => {
           <MessageSquare className="w-4 h-4" />
           Descargos
         </button>
+        <button
+          onClick={() => setActiveTab('conteos')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            activeTab === 'conteos'
+              ? 'bg-mascotera-accent text-mascotera-dark'
+              : 'text-mascotera-text-muted hover:text-mascotera-text hover:bg-mascotera-card'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          Control de Stock
+          {conteosPendientes.length > 0 && (
+            <span className="bg-mascotera-danger text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {conteosPendientes.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {activeTab === 'descargos' && <DescargosSection />}
+
+      {/* Tab: Control de Stock */}
+      {activeTab === 'conteos' && (
+        <div className="space-y-4">
+          <div className="card-mascotera">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-mascotera-text flex items-center gap-2">
+                <Package className="w-5 h-5 text-mascotera-accent" />
+                Conteos de Stock Pendientes de Revisión
+              </h3>
+              <span className="bg-mascotera-accent/20 text-mascotera-accent text-xs font-semibold px-2.5 py-1 rounded-full">
+                {conteosPendientes.length} pendiente{conteosPendientes.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {conteosPendientes.length === 0 ? (
+              <div className="text-center py-12">
+                <Check className="w-12 h-12 text-mascotera-success mx-auto mb-3 opacity-60" />
+                <h4 className="text-lg font-semibold text-mascotera-text mb-1">Todo al día</h4>
+                <p className="text-sm text-mascotera-text-muted">No hay conteos de stock pendientes de revisión</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {conteosPendientes.map(conteo => {
+                  const sucNombre = conteo.sucursal_nombre
+                    ? conteo.sucursal_nombre.replace(/^SUCURSAL\s+/i, '')
+                    : `Sucursal #${conteo.sucursal_id}`;
+                  const dif = parseFloat(conteo.valorizacion_diferencia) || 0;
+                  const fecha = conteo.fecha_conteo ? new Date(conteo.fecha_conteo).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+
+                  return (
+                    <div key={conteo.id} className="bg-mascotera-darker rounded-xl p-4 border border-mascotera-border/50 hover:border-mascotera-accent/30 transition-colors">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            Math.abs(dif) >= 150000 ? 'bg-mascotera-danger/20' : 'bg-mascotera-success/20'
+                          }`}>
+                            <Package className={`w-5 h-5 ${Math.abs(dif) >= 150000 ? 'text-mascotera-danger' : 'text-mascotera-success'}`} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-mascotera-text">{sucNombre}</p>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-mascotera-accent/20 text-mascotera-accent">
+                                {conteo.estado?.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1 text-xs text-mascotera-text-muted flex-wrap">
+                              <span>Fecha: {fecha}</span>
+                              <span>Realizado por: {conteo.empleado_nombre || '-'}</span>
+                              <span>{conteo.productos_contados} productos contados</span>
+                              <span>{conteo.productos_con_diferencia} con diferencia</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="text-xs text-mascotera-text-muted">Diferencia Neta</p>
+                            <p className={`text-lg font-bold ${dif < 0 ? 'text-mascotera-danger' : dif > 0 ? 'text-mascotera-success' : 'text-mascotera-text'}`}>
+                              ${Math.abs(dif).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedConteo(conteo);
+                              setComentarioAjuste('');
+                              setAjusteModalOpen(true);
+                            }}
+                            className="btn-primary flex items-center gap-2 px-4 py-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            Ajustado
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Ajuste de Stock */}
+      {ajusteModalOpen && selectedConteo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-mascotera-card rounded-xl border border-mascotera-border max-w-lg w-full shadow-2xl">
+            <div className="bg-mascotera-darker p-5 border-b border-mascotera-border rounded-t-xl flex items-center justify-between">
+              <h2 className="text-lg font-bold text-mascotera-text">Confirmar Ajuste de Stock</h2>
+              <button
+                onClick={() => { setAjusteModalOpen(false); setSelectedConteo(null); }}
+                className="p-2 hover:bg-mascotera-card rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-mascotera-text-muted" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-mascotera-text-muted uppercase tracking-wider">Sucursal</label>
+                <p className="text-mascotera-text font-semibold mt-1">
+                  {selectedConteo.sucursal_nombre?.replace(/^SUCURSAL\s+/i, '') || `Sucursal #${selectedConteo.sucursal_id}`}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-mascotera-text-muted uppercase tracking-wider">Productos Contados</label>
+                  <p className="text-mascotera-text font-semibold mt-1">{selectedConteo.productos_contados}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-mascotera-text-muted uppercase tracking-wider">Diferencia Neta</label>
+                  <p className={`font-semibold mt-1 ${parseFloat(selectedConteo.valorizacion_diferencia) < 0 ? 'text-mascotera-danger' : 'text-mascotera-success'}`}>
+                    ${Math.abs(parseFloat(selectedConteo.valorizacion_diferencia) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-mascotera-text-muted uppercase tracking-wider block mb-2">
+                  Comentario del Auditor (opcional)
+                </label>
+                <textarea
+                  className="input-mascotera w-full h-24 resize-none"
+                  placeholder="Agregar comentario sobre el ajuste..."
+                  value={comentarioAjuste}
+                  onChange={(e) => setComentarioAjuste(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => { setAjusteModalOpen(false); setSelectedConteo(null); }}
+                  className="btn-secondary px-4 py-2 text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setAjustandoId(selectedConteo.id);
+                    const success = await ajustarConteoStock(selectedConteo.id, comentarioAjuste || null);
+                    setAjustandoId(null);
+                    if (success) {
+                      setAjusteModalOpen(false);
+                      setSelectedConteo(null);
+                      setComentarioAjuste('');
+                    }
+                  }}
+                  disabled={ajustandoId === selectedConteo.id}
+                  className={`btn-primary px-4 py-2 text-sm flex items-center gap-2 ${ajustandoId === selectedConteo.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <Check className="w-4 h-4" />
+                  {ajustandoId === selectedConteo.id ? 'Guardando...' : 'Confirmar Ajuste'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'auditorias' && <>
       {/* Tabla de Resumen - Sucursales Tradicionales */}
