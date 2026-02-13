@@ -11,9 +11,6 @@ export const useAudit = () => {
   return context;
 };
 
-// Nombre del auditor principal (tiene permisos de aprobar/desaprobar)
-const AUDITOR_NAMES = ['santiago'];
-
 export const AuditProvider = ({ children }) => {
   const [auditData, setAuditData] = useState({});
   const [sucursalesDB, setSucursalesDB] = useState([]);
@@ -26,6 +23,7 @@ export const AuditProvider = ({ children }) => {
   const [loadingObservaciones, setLoadingObservaciones] = useState(false);
 
   // Usuario actual (persistido en localStorage)
+  // Estructura: { id, nombre, apellido, usuario, rol, puesto, sucursal_id, accessLevel }
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const stored = localStorage.getItem('audit_current_user');
@@ -40,8 +38,43 @@ export const AuditProvider = ({ children }) => {
     }
   }, [currentUser]);
 
-  // Verificar si el usuario actual es auditor
-  const isAuditor = currentUser && AUDITOR_NAMES.includes(currentUser.nombre.toLowerCase().trim());
+  // Login contra la API (employees + permisos)
+  const loginUser = async (usuario, password) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Error de autenticación' };
+      }
+
+      setCurrentUser(data);
+      return { success: true, user: data };
+    } catch (err) {
+      console.error('Error en login:', err);
+      return { success: false, error: 'Error de conexión con el servidor' };
+    }
+  };
+
+  // Logout
+  const logoutUser = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('audit_current_user');
+  };
+
+  // Nombre para mostrar
+  const userDisplayName = currentUser
+    ? `${currentUser.nombre} ${currentUser.apellido}`.replace(/\b\w+/g, w => w.charAt(0) + w.slice(1).toLowerCase())
+    : '';
+
+  // Niveles de acceso basados en accessLevel del backend
+  const isAuditor = currentUser?.accessLevel === 'auditor';
+  const isPilaresOnly = currentUser?.accessLevel === 'pilares_only';
 
   // Auditores por sucursal (persistido en localStorage)
   const [auditoresPorSucursal, setAuditoresPorSucursal] = useState(() => {
@@ -391,7 +424,11 @@ export const AuditProvider = ({ children }) => {
     // Usuario
     currentUser,
     setCurrentUser,
-    isAuditor
+    loginUser,
+    logoutUser,
+    userDisplayName,
+    isAuditor,
+    isPilaresOnly
   };
 
   return (

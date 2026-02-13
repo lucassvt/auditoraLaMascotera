@@ -29,8 +29,7 @@ import {
   Image,
   ThumbsUp,
   ThumbsDown,
-  User,
-  LogIn
+  User
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 import { useNavigate } from 'react-router-dom';
@@ -41,7 +40,7 @@ const Checklist = () => {
     fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, updateAuditoresSucursal,
     getAuditoresSucursal, generateReport,
     observaciones, fetchObservaciones, createObservacion, updateObservacionEstado, deleteObservacion,
-    currentUser, setCurrentUser, isAuditor
+    currentUser, isAuditor, userDisplayName
   } = useAudit();
   const navigate = useNavigate();
   const [tareasDetalle, setTareasDetalle] = useState([]);
@@ -60,8 +59,6 @@ const Checklist = () => {
   const [obsImagePreviews, setObsImagePreviews] = useState({});
   const [obsSending, setObsSending] = useState({});
   const [obsComentarioAuditor, setObsComentarioAuditor] = useState({});
-  // Login prompt
-  const [loginNombre, setLoginNombre] = useState('');
 
   // Umbral de aprobación automática de stock (valor absoluto en pesos)
   const STOCK_THRESHOLD = 150000;
@@ -542,7 +539,7 @@ const Checklist = () => {
     const imageFiles = obsImagenes[pilarKey] || [];
     const criticidad = obsCriticidad[pilarKey] || 'media';
 
-    await createObservacion(sucDB.id, pilarKey, mesKey, texto, criticidad, currentUser.nombre, imageFiles);
+    await createObservacion(sucDB.id, pilarKey, mesKey, texto, criticidad, userDisplayName, imageFiles);
 
     // Limpiar form
     setObsTexto(prev => ({ ...prev, [pilarKey]: '' }));
@@ -716,52 +713,6 @@ const Checklist = () => {
     };
   };
 
-  // Si no hay usuario, mostrar login
-  if (!currentUser) {
-    return (
-      <div className="space-y-6 animate-fadeIn">
-        <div className="max-w-md mx-auto mt-20">
-          <div className="card-mascotera text-center">
-            <div className="w-16 h-16 rounded-full bg-mascotera-accent/20 flex items-center justify-center mx-auto mb-4">
-              <LogIn className="w-8 h-8 text-mascotera-accent" />
-            </div>
-            <h2 className="text-xl font-bold text-mascotera-text mb-2">Identificarse</h2>
-            <p className="text-sm text-mascotera-text-muted mb-6">
-              Ingresa tu nombre para acceder al sistema de auditoría
-            </p>
-            <div className="space-y-4">
-              <input
-                type="text"
-                value={loginNombre}
-                onChange={(e) => setLoginNombre(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && loginNombre.trim()) {
-                    setCurrentUser({ nombre: loginNombre.trim() });
-                  }
-                }}
-                placeholder="Tu nombre..."
-                className="input-mascotera w-full text-center"
-                autoFocus
-              />
-              <button
-                onClick={() => {
-                  if (loginNombre.trim()) {
-                    setCurrentUser({ nombre: loginNombre.trim() });
-                  }
-                }}
-                disabled={!loginNombre.trim()}
-                className={`btn-primary w-full flex items-center justify-center gap-2 ${!loginNombre.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <User className="w-4 h-4" />
-                Ingresar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
@@ -775,7 +726,7 @@ const Checklist = () => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-mascotera-card rounded-lg border border-mascotera-border">
             <User className="w-4 h-4 text-mascotera-accent" />
-            <span className="text-sm text-mascotera-text font-medium">{currentUser.nombre}</span>
+            <span className="text-sm text-mascotera-text font-medium">{userDisplayName}</span>
             {isAuditor && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-mascotera-accent/20 text-mascotera-accent">AUDITOR</span>
             )}
@@ -1407,7 +1358,7 @@ const Checklist = () => {
                       <div className="bg-mascotera-darker/30 rounded-lg p-4 space-y-3">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="w-4 h-4 text-mascotera-accent" />
-                          <span className="text-xs font-semibold text-mascotera-text">{currentUser?.nombre}</span>
+                          <span className="text-xs font-semibold text-mascotera-text">{userDisplayName}</span>
                           <span className="text-xs text-mascotera-text-muted">- Nueva observación</span>
                         </div>
                         <textarea
@@ -1570,7 +1521,7 @@ const Checklist = () => {
                                 )}
 
                                 {/* Eliminar (solo el creador o auditor) */}
-                                {(isAuditor || obs.creado_por === currentUser?.nombre) && (
+                                {(isAuditor || obs.creado_por === userDisplayName) && (
                                   <div className="mt-2 flex justify-end">
                                     <button
                                       onClick={() => {

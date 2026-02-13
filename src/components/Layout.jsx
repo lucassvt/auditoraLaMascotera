@@ -14,9 +14,13 @@ import {
   Search,
   LogOut,
   Settings,
-  Clock,
   MessageSquare,
-  ArrowRight
+  ArrowRight,
+  LogIn,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Shield
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 
@@ -41,7 +45,14 @@ const Layout = ({ children }) => {
   const notifRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { descargos } = useAudit();
+  const { descargos, currentUser, loginUser, logoutUser, userDisplayName, isAuditor, isPilaresOnly } = useAudit();
+
+  // Login form state
+  const [loginUsuario, setLoginUsuario] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const descargosPendientes = descargos.filter(d => d.estado === 'pendiente');
 
@@ -56,7 +67,33 @@ const Layout = ({ children }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const menuItems = [
+  // Redirigir usuarios pilares_only a /checklist si intentan otra ruta
+  useEffect(() => {
+    if (currentUser && isPilaresOnly && location.pathname !== '/checklist') {
+      navigate('/checklist', { replace: true });
+    }
+  }, [currentUser, isPilaresOnly, location.pathname, navigate]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!loginUsuario.trim() || !loginPassword) return;
+
+    setLoginLoading(true);
+    setLoginError('');
+
+    const result = await loginUser(loginUsuario.trim(), loginPassword);
+
+    if (!result.success) {
+      setLoginError(result.error);
+    } else {
+      setLoginUsuario('');
+      setLoginPassword('');
+    }
+    setLoginLoading(false);
+  };
+
+  // Todas las opciones del menú
+  const allMenuItems = [
     {
       path: '/',
       icon: LayoutDashboard,
@@ -95,8 +132,118 @@ const Layout = ({ children }) => {
     },
   ];
 
+  // Filtrar menú según nivel de acceso
+  const menuItems = isPilaresOnly
+    ? allMenuItems.filter(item => item.path === '/checklist')
+    : allMenuItems;
+
   const isActive = (path) => location.pathname === path;
 
+  const accessLevelLabel = {
+    auditor: 'Auditor',
+    full: 'Acceso Completo',
+    pilares_only: 'Observador'
+  };
+
+  // ========== PANTALLA DE LOGIN ==========
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-mascotera-dark flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-mascotera-accent/20 flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-10 h-10 text-mascotera-accent" />
+            </div>
+            <h1 className="font-display text-2xl font-bold text-mascotera-text">
+              AUDITORIA
+            </h1>
+            <p className="text-mascotera-text-muted mt-1">La Mascotera</p>
+          </div>
+
+          {/* Login Form */}
+          <div className="card-mascotera">
+            <div className="flex items-center gap-2 mb-6">
+              <LogIn className="w-5 h-5 text-mascotera-accent" />
+              <h2 className="text-lg font-semibold text-mascotera-text">Iniciar Sesión</h2>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="text-sm text-mascotera-text-muted mb-1.5 block">Usuario</label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-mascotera-text-muted" />
+                  <input
+                    type="text"
+                    value={loginUsuario}
+                    onChange={(e) => { setLoginUsuario(e.target.value); setLoginError(''); }}
+                    placeholder="Tu usuario..."
+                    className="input-mascotera w-full pl-10"
+                    autoFocus
+                    autoComplete="username"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-mascotera-text-muted mb-1.5 block">Contraseña</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={loginPassword}
+                    onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
+                    placeholder="Tu contraseña..."
+                    className="input-mascotera w-full pr-10"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-mascotera-text-muted hover:text-mascotera-accent transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {loginError && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-mascotera-danger/10 border border-mascotera-danger/30">
+                  <AlertCircle className="w-4 h-4 text-mascotera-danger flex-shrink-0" />
+                  <p className="text-sm text-mascotera-danger">{loginError}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!loginUsuario.trim() || !loginPassword || loginLoading}
+                className={`btn-primary w-full flex items-center justify-center gap-2 py-3 ${
+                  (!loginUsuario.trim() || !loginPassword || loginLoading) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {loginLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-mascotera-darker/30 border-t-mascotera-darker rounded-full animate-spin" />
+                    Verificando...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    Ingresar
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          <p className="text-center text-xs text-mascotera-text-muted mt-6">
+            Solo personal autorizado
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ========== LAYOUT PRINCIPAL ==========
   return (
     <div className="min-h-screen bg-mascotera-dark flex">
       {/* Sidebar */}
@@ -149,21 +296,44 @@ const Layout = ({ children }) => {
           })}
         </nav>
 
-        {/* Collapse Button */}
-        <div className="p-4 border-t border-mascotera-border">
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full flex items-center justify-center gap-2 py-2 text-mascotera-text-muted hover:text-mascotera-accent transition-colors"
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="w-5 h-5" />
-            ) : (
-              <>
-                <ChevronLeft className="w-5 h-5" />
-                <span className="text-sm">Colapsar</span>
-              </>
-            )}
-          </button>
+        {/* User Info + Logout */}
+        <div className="p-4 border-t border-mascotera-border space-y-3">
+          {!sidebarCollapsed && (
+            <div className="px-2">
+              <p className="text-sm font-medium text-mascotera-text truncate">{userDisplayName}</p>
+              <p className="text-[10px] text-mascotera-text-muted">{currentUser.puesto || currentUser.rol}</p>
+              <span className={`inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                isAuditor ? 'bg-mascotera-accent/20 text-mascotera-accent' :
+                isPilaresOnly ? 'bg-mascotera-info/20 text-mascotera-info' :
+                'bg-mascotera-success/20 text-mascotera-success'
+              }`}>
+                {accessLevelLabel[currentUser.accessLevel] || 'Usuario'}
+              </span>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="flex-1 flex items-center justify-center gap-2 py-2 text-mascotera-text-muted hover:text-mascotera-accent transition-colors"
+              title={sidebarCollapsed ? 'Expandir' : 'Colapsar'}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="w-5 h-5" />
+              ) : (
+                <>
+                  <ChevronLeft className="w-5 h-5" />
+                  <span className="text-sm">Colapsar</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={logoutUser}
+              className="p-2 text-mascotera-text-muted hover:text-mascotera-danger transition-colors rounded-lg hover:bg-mascotera-danger/10"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -267,16 +437,11 @@ const Layout = ({ children }) => {
               )}
             </div>
 
-            {/* Settings */}
-            <button className="p-2 text-mascotera-text-muted hover:text-mascotera-accent transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
-
             {/* User Menu */}
             <div className="flex items-center gap-3 pl-4 border-l border-mascotera-border">
               <div className="text-right">
-                <p className="text-sm font-medium text-mascotera-text">Auditor</p>
-                <p className="text-xs text-mascotera-text-muted">Administrador</p>
+                <p className="text-sm font-medium text-mascotera-text">{userDisplayName}</p>
+                <p className="text-xs text-mascotera-text-muted">{accessLevelLabel[currentUser.accessLevel] || 'Usuario'}</p>
               </div>
               <div className="w-10 h-10 rounded-full bg-mascotera-accent/20 flex items-center justify-center">
                 <User className="w-5 h-5 text-mascotera-accent" />

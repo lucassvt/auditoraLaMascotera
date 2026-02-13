@@ -4,7 +4,12 @@ const { Pool } = require('pg');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 const { createTunnel, LOCAL_PORT } = require('./ssh-tunnel');
+
+// Access level config for Auditoría system
+const AUDITOR_IDS = [50]; // Santiago Rivero
+const PILARES_ONLY_IDS = [1681, 1689]; // Mayra Fernanda Alias Rita, Maia Sol Gongora
 
 const app = express();
 app.use(cors());
@@ -612,6 +617,69 @@ app.delete('/api/observaciones/:id', async (req, res) => {
   } catch (err) {
     console.error('Error eliminando observación:', err.message);
     res.status(500).json({ error: 'Error al eliminar observación' });
+  }
+});
+
+// ========== AUTENTICACIÓN ==========
+
+// POST /api/auth/login - login contra employees + permisos de Auditoría
+app.post('/api/auth/login', async (req, res) => {
+  const { usuario, password } = req.body;
+
+  if (!usuario || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+  }
+
+  try {
+    const empResult = await poolDuxIntegrada.query(
+      `SELECT id, nombre, apellido, usuario, password_hash, rol, puesto, nivel, sucursal_id, activo
+       FROM employees WHERE LOWER(usuario) = $1`,
+      [usuario.toLowerCase().trim()]
+    );
+
+    if (empResult.rows.length === 0) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+
+    const employee = empResult.rows[0];
+
+    if (!employee.activo) {
+      return res.status(401).json({ error: 'Usuario desactivado' });
+    }
+
+    const passwordValid = await bcrypt.compare(password, employee.password_hash);
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+
+    // Verificar permiso para Auditoría (sistema_id = 11)
+    const permResult = await poolDuxIntegrada.query(
+      `SELECT activo FROM permisos_usuario_sistema WHERE employee_id = $1 AND sistema_id = 11`,
+      [employee.id]
+    );
+
+    if (permResult.rows.length === 0 || !permResult.rows[0].activo) {
+      return res.status(403).json({ error: 'No tienes permiso para acceder al sistema de Auditoría' });
+    }
+
+    // Determinar nivel de acceso
+    let accessLevel = 'full';
+    if (AUDITOR_IDS.includes(employee.id)) accessLevel = 'auditor';
+    else if (PILARES_ONLY_IDS.includes(employee.id)) accessLevel = 'pilares_only';
+
+    res.json({
+      id: employee.id,
+      nombre: employee.nombre,
+      apellido: employee.apellido,
+      usuario: employee.usuario,
+      rol: employee.rol,
+      puesto: employee.puesto,
+      sucursal_id: employee.sucursal_id,
+      accessLevel
+    });
+  } catch (err) {
+    console.error('Error en login:', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
