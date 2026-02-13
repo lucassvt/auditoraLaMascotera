@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Download,
   Filter,
@@ -17,10 +18,20 @@ import { useAudit } from '../context/AuditContext';
 import DescargosSection from '../components/DescargosSection';
 
 const Auditorias = () => {
+  const routeLocation = useLocation();
   const { sucursalesNombres, sucursalesDB, tareasResumen, conteosStock, fetchTareasResumen, fetchTareasSucursal, fetchConteosStock } = useAudit();
   const [selectedPilarDetail, setSelectedPilarDetail] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('auditorias');
+
+  // Abrir pestaña descargos si se navega desde notificaciones
+  useEffect(() => {
+    if (routeLocation.state?.openDescargos) {
+      setActiveTab('descargos');
+      // Limpiar el state para que no se reabra al volver
+      window.history.replaceState({}, document.title);
+    }
+  }, [routeLocation.state]);
   const [tareasDetalle, setTareasDetalle] = useState([]);
   const [loadingTareas, setLoadingTareas] = useState(false);
 
