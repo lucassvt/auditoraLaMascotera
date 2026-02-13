@@ -921,8 +921,8 @@ const Checklist = () => {
                   </div>
                 </div>
 
-                {/* Secciones de auditoría (solo auditor) */}
-                {isAuditor && (<>
+                {/* Secciones de auditoría */}
+                <>
                 {/* Dato Anexo - Orden y Limpieza */}
                 {pilarKey === 'ordenLimpieza' && (() => {
                   const tareasInfo = getTareasResumen();
@@ -1367,7 +1367,7 @@ const Checklist = () => {
                     )}
                   </div>
                 </div>
-                </>)}
+                </>
 
                 {/* Notas del Auditor */}
                 {isAuditor && (
