@@ -325,20 +325,62 @@ export const AuditProvider = ({ children }) => {
   };
 
   // --- Funciones de informes generados ---
-  const generateReport = async (sucursal, mesKey, pilaresData, resumen, pilarScores = {}) => {
+
+  // Verificar cuántos reportes hay para una sucursal/mes y qué tipos
+  const getReportTypesForSucursalMes = (sucursal, mesKey) => {
+    const reportsForMes = generatedReports.filter(r => r.sucursal === sucursal && r.mesKey === mesKey);
+    return {
+      count: reportsForMes.length,
+      hasPreliminar: reportsForMes.some(r => r.tipoInforme === 'preliminar'),
+      hasFinal: reportsForMes.some(r => r.tipoInforme === 'final'),
+      reports: reportsForMes
+    };
+  };
+
+  const generateReport = async (sucursal, mesKey, pilaresData, resumen, pilarScores = {}, tipoInforme = 'preliminar') => {
+    // Validar límite de 2 reportes por mes (1 preliminar + 1 final)
+    const existing = getReportTypesForSucursalMes(sucursal, mesKey);
+    if (existing.count >= 2) {
+      throw new Error('Ya se generaron los 2 informes permitidos para este mes (preliminar y final).');
+    }
+    if (tipoInforme === 'preliminar' && existing.hasPreliminar) {
+      throw new Error('Ya existe un informe preliminar para esta sucursal en este período.');
+    }
+    if (tipoInforme === 'final' && existing.hasFinal) {
+      throw new Error('Ya existe un informe final para esta sucursal en este período.');
+    }
+
     const descargosFiltered = descargos.filter(d => {
       const nombre = d.sucursal_nombre ? d.sucursal_nombre.replace(/^SUCURSAL\s+/i, '') : `Sucursal #${d.sucursal_id}`;
       return nombre === sucursal;
     });
 
+    // Fetch observaciones de la sucursal para incluirlas en el informe
+    let observacionesInforme = [];
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === sucursal);
+    if (sucDB) {
+      try {
+        const params = new URLSearchParams();
+        params.append('sucursal_id', sucDB.id);
+        params.append('periodo', mesKey);
+        const obsRes = await fetch(`${API_BASE}/observaciones?${params.toString()}`);
+        const obsData = await obsRes.json();
+        observacionesInforme = Array.isArray(obsData) ? obsData : [];
+      } catch (err) {
+        console.error('Error cargando observaciones para informe:', err);
+      }
+    }
+
     const report = {
       id: `RPT-${Date.now()}`,
       sucursal,
       mesKey,
+      tipoInforme,
       auditores: [...(auditoresPorSucursal[sucursal] || [])],
       pilaresData: JSON.parse(JSON.stringify(pilaresData)),
       resumen,
       descargos: JSON.parse(JSON.stringify(descargosFiltered)),
+      observacionesInforme: JSON.parse(JSON.stringify(observacionesInforme)),
       fechaGeneracion: new Date().toISOString(),
       estado: 'generado'
     };
@@ -346,7 +388,6 @@ export const AuditProvider = ({ children }) => {
     setGeneratedReports(prev => [report, ...prev]);
 
     // Persistir en la base de datos para que Mi Sucursal pueda consultarlo
-    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === sucursal);
     if (sucDB) {
       try {
         const dbResponse = await fetch(`${API_BASE}/informes`, {
@@ -355,6 +396,7 @@ export const AuditProvider = ({ children }) => {
           body: JSON.stringify({
             sucursal_id: sucDB.id,
             periodo: mesKey,
+            tipo_informe: tipoInforme,
             orden_limpieza: pilarScores.ordenLimpieza ?? null,
             pedidos: pilarScores.pedidosYa ?? null,
             gestion_administrativa: pilarScores.gestionAdministrativa ?? null,
@@ -420,6 +462,7 @@ export const AuditProvider = ({ children }) => {
     generateReport,
     deleteReport,
     getReportsByMes,
+    getReportTypesForSucursalMes,
     // Observaciones
     observaciones,
     loadingObservaciones,

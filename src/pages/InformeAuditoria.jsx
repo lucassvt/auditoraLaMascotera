@@ -14,7 +14,9 @@ import {
   MessageSquare,
   Info,
   ArrowLeft,
-  Lock
+  Lock,
+  Image,
+  User
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 import { API_BASE } from '../config';
@@ -344,7 +346,7 @@ const InformeAuditoria = () => {
                   <span className="bg-mascotera-accent/20 text-mascotera-accent text-xs font-semibold px-2.5 py-1 rounded-full">Solo lectura</span>
                 </div>
                 <p className="text-mascotera-text font-semibold mt-1">
-                  Informe de Auditoría - {viewingReport.sucursal}
+                  Informe {viewingReport.tipoInforme === 'final' ? 'Final' : 'Preliminar'} de Auditoría - {viewingReport.sucursal}
                 </p>
                 <div className="flex items-center gap-4 text-xs text-mascotera-text-muted mt-1 flex-wrap">
                   <span>Período: {periodoFormateado}</span>
@@ -668,6 +670,110 @@ const InformeAuditoria = () => {
             </div>
           )}
 
+          {/* Observaciones del Informe (solo en reportes generados) */}
+          {viewingReport?.observacionesInforme?.length > 0 && (
+            <div className="card-mascotera space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-semibold text-mascotera-text flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-mascotera-accent" />
+                  Observaciones por Pilar
+                </h4>
+                <span className="bg-mascotera-accent/20 text-mascotera-accent text-xs font-semibold px-2.5 py-1 rounded-full">
+                  {viewingReport.observacionesInforme.length} observación(es)
+                </span>
+              </div>
+
+              {/* Agrupar por pilar */}
+              {(() => {
+                const byPilar = {};
+                viewingReport.observacionesInforme.forEach(obs => {
+                  const key = obs.pilar_key || 'otros';
+                  if (!byPilar[key]) byPilar[key] = [];
+                  byPilar[key].push(obs);
+                });
+
+                const pilarNames = {
+                  ordenLimpieza: 'Orden y Limpieza',
+                  serviciosClub: 'Servicios y Club la Mascotera',
+                  gestionAdministrativa: 'Gestión Administrativa y Sistema',
+                  pedidosYa: 'Pedidos Ya / Whatsapp WEB',
+                  stockCaja: 'Stock y Caja',
+                  gestionPedidos: 'Gestión de Pedidos',
+                  mantenimientoVehiculos: 'Mantenimiento de Vehículos'
+                };
+
+                const criticidadColors = {
+                  baja: 'bg-blue-500/20 text-blue-400',
+                  media: 'bg-mascotera-warning/20 text-mascotera-warning',
+                  alta: 'bg-mascotera-danger/20 text-mascotera-danger',
+                  critica: 'bg-red-500/20 text-red-500'
+                };
+
+                const estadoColors = {
+                  pendiente: 'bg-mascotera-warning/20 text-mascotera-warning',
+                  aprobada: 'bg-mascotera-success/20 text-mascotera-success',
+                  desaprobada: 'bg-mascotera-danger/20 text-mascotera-danger'
+                };
+
+                return Object.entries(byPilar).map(([pilarKey, obsList]) => (
+                  <div key={pilarKey} className="space-y-2">
+                    <h5 className="text-sm font-bold text-mascotera-accent uppercase tracking-wider">
+                      {pilarNames[pilarKey] || pilarKey}
+                    </h5>
+                    {obsList.map(obs => (
+                      <div key={obs.id} className={`bg-mascotera-darker rounded-lg p-4 border ${
+                        obs.estado === 'aprobada' ? 'border-mascotera-success/30' :
+                        obs.estado === 'desaprobada' ? 'border-mascotera-danger/30' :
+                        'border-mascotera-border/50'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <User className="w-3.5 h-3.5 text-mascotera-accent" />
+                            <span className="text-sm font-semibold text-mascotera-text">{obs.creado_por}</span>
+                            <span className="text-[10px] text-mascotera-text-muted">
+                              {new Date(obs.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${criticidadColors[obs.criticidad] || 'bg-mascotera-warning/20 text-mascotera-warning'}`}>
+                              {obs.criticidad?.toUpperCase()}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${estadoColors[obs.estado] || estadoColors.pendiente}`}>
+                              {obs.estado === 'aprobada' ? 'Aprobada' : obs.estado === 'desaprobada' ? 'Desaprobada' : 'Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-mascotera-text">{obs.texto}</p>
+
+                        {obs.comentario_auditor && (
+                          <div className="bg-mascotera-card/50 rounded p-2 mt-2">
+                            <p className="text-[10px] font-bold text-mascotera-accent mb-0.5">Comentario del Auditor:</p>
+                            <p className="text-xs text-mascotera-text">{obs.comentario_auditor}</p>
+                          </div>
+                        )}
+
+                        {/* Imágenes de la observación */}
+                        {obs.imagenes && obs.imagenes.length > 0 && (
+                          <div className="mt-3 flex gap-2 flex-wrap">
+                            {obs.imagenes.map((img, imgIdx) => (
+                              <a key={imgIdx} href={img.url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={img.url}
+                                  alt={img.originalname || `Imagen ${imgIdx + 1}`}
+                                  className="w-24 h-24 object-cover rounded-lg border border-mascotera-border hover:border-mascotera-accent transition-colors"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+
           {/* Si solo hay descargos y no datos de pilares */}
           {!hasData && descargosForSucursal.length > 0 && (
             <div className="card-mascotera border-mascotera-info/30">
@@ -690,7 +796,7 @@ const InformeAuditoria = () => {
             <div className="print-header">
               <div className="print-header-top">
                 <div>
-                  <h1 className="print-title">INFORME DE AUDITORÍA</h1>
+                  <h1 className="print-title">INFORME {viewingReport?.tipoInforme === 'final' ? 'FINAL' : 'PRELIMINAR'} DE AUDITORÍA</h1>
                   <p className="print-subtitle">La Mascotera - Sistema de Auditoría</p>
                 </div>
                 <div className="print-header-right">
@@ -874,6 +980,63 @@ const InformeAuditoria = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Observaciones por Pilar (print) */}
+            {viewingReport?.observacionesInforme?.length > 0 && (
+              <div className="print-section">
+                <h2 className="print-section-title">Observaciones por Pilar</h2>
+                {(() => {
+                  const byPilar = {};
+                  viewingReport.observacionesInforme.forEach(obs => {
+                    const key = obs.pilar_key || 'otros';
+                    if (!byPilar[key]) byPilar[key] = [];
+                    byPilar[key].push(obs);
+                  });
+
+                  const pilarNames = {
+                    ordenLimpieza: 'Orden y Limpieza',
+                    serviciosClub: 'Servicios y Club la Mascotera',
+                    gestionAdministrativa: 'Gestión Administrativa y Sistema',
+                    pedidosYa: 'Pedidos Ya / Whatsapp WEB',
+                    stockCaja: 'Stock y Caja',
+                    gestionPedidos: 'Gestión de Pedidos',
+                    mantenimientoVehiculos: 'Mantenimiento de Vehículos'
+                  };
+
+                  return Object.entries(byPilar).map(([pilarKey, obsList]) => (
+                    <div key={pilarKey} style={{ marginBottom: '16px' }}>
+                      <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#333', borderBottom: '1px solid #ddd', paddingBottom: '4px' }}>
+                        {pilarNames[pilarKey] || pilarKey}
+                      </h3>
+                      {obsList.map(obs => (
+                        <div key={obs.id} style={{ marginBottom: '10px', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '6px', backgroundColor: obs.estado === 'aprobada' ? '#f0fdf4' : obs.estado === 'desaprobada' ? '#fef2f2' : '#fafafa' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px' }}>
+                            <span><strong>{obs.creado_por}</strong> - {new Date(obs.created_at).toLocaleDateString('es-AR')}</span>
+                            <span>
+                              <strong style={{ textTransform: 'uppercase' }}>{obs.criticidad}</strong> | {obs.estado === 'aprobada' ? 'Aprobada' : obs.estado === 'desaprobada' ? 'Desaprobada' : 'Pendiente'}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '12px', margin: '6px 0' }}>{obs.texto}</p>
+                          {obs.comentario_auditor && (
+                            <p style={{ fontSize: '11px', color: '#666', fontStyle: 'italic', margin: '4px 0' }}>
+                              <strong>Auditor:</strong> {obs.comentario_auditor}
+                            </p>
+                          )}
+                          {obs.imagenes && obs.imagenes.length > 0 && (
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                              {obs.imagenes.map((img, imgIdx) => (
+                                <img key={imgIdx} src={img.url} alt={img.originalname || `Imagen ${imgIdx + 1}`}
+                                  style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #ddd' }} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ));
+                })()}
               </div>
             )}
 

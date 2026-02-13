@@ -286,10 +286,6 @@ const Reportes = () => {
           <button onClick={handleNextMonth} className="p-2 rounded-lg bg-mascotera-darker hover:bg-mascotera-card transition-colors text-mascotera-text">
             <ChevronRight className="w-5 h-5" />
           </button>
-          <button className="btn-secondary flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Exportar Reporte
-          </button>
           <button
             onClick={() => setNuevoHallazgoModalOpen(true)}
             className="btn-primary flex items-center gap-2"
@@ -960,9 +956,18 @@ const Reportes = () => {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono text-sm text-mascotera-accent">{report.id}</span>
                               <span className="badge badge-success">Generado</span>
+                              {report.tipoInforme && (
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                  report.tipoInforme === 'final'
+                                    ? 'bg-mascotera-accent/20 text-mascotera-accent'
+                                    : 'bg-mascotera-info/20 text-mascotera-info'
+                                }`}>
+                                  {report.tipoInforme === 'final' ? 'FINAL' : 'PRELIMINAR'}
+                                </span>
+                              )}
                             </div>
                             <h3 className="font-semibold text-mascotera-text mt-2">
-                              Informe de Auditoría - {report.sucursal}
+                              Informe {report.tipoInforme === 'final' ? 'Final' : 'Preliminar'} de Auditoría - {report.sucursal}
                             </h3>
                             <p className="text-sm text-mascotera-text-muted mt-1">
                               Período: {report.mesKey} | {report.resumen?.totalPilares || 0} pilares evaluados
@@ -1007,6 +1012,12 @@ const Reportes = () => {
                             <span className="flex items-center gap-1 text-mascotera-warning">
                               <MessageSquare className="w-4 h-4" />
                               {report.descargos.length} descargo(s)
+                            </span>
+                          )}
+                          {report.observacionesInforme?.length > 0 && (
+                            <span className="flex items-center gap-1 text-mascotera-accent">
+                              <MessageSquare className="w-4 h-4" />
+                              {report.observacionesInforme.length} observación(es)
                             </span>
                           )}
                         </div>

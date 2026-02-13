@@ -13,7 +13,6 @@ import {
   Truck,
   Upload,
   X,
-  Download,
   Check,
   ChevronDown,
   Calendar as CalendarIcon,
@@ -38,7 +37,7 @@ const Checklist = () => {
   const {
     auditData, setAuditData, sucursalesNombres, sucursalesDB, tareasResumen, conteosStock,
     fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, updateAuditoresSucursal,
-    getAuditoresSucursal, generateReport,
+    getAuditoresSucursal, generateReport, getReportTypesForSucursalMes,
     observaciones, fetchObservaciones, createObservacion, updateObservacionEstado, deleteObservacion,
     currentUser, isAuditor, userDisplayName
   } = useAudit();
@@ -49,6 +48,8 @@ const Checklist = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [auditoresLocal, setAuditoresLocal] = useState(['']);
   const [generandoInforme, setGenerandoInforme] = useState(false);
+  const [tipoInformeModal, setTipoInformeModal] = useState(false);
+  const [tipoInformeSeleccionado, setTipoInformeSeleccionado] = useState(null);
   const [autoEvaluatedItems, setAutoEvaluatedItems] = useState({});
 
   // Observaciones UI state
@@ -328,68 +329,6 @@ const Checklist = () => {
     setAuditData({ ...auditData });
   };
 
-  // Exportar informe
-  const exportarInforme = () => {
-    if (!selectedSucursal || !auditData[selectedSucursal]) {
-      alert('No hay datos de auditoría para exportar');
-      return;
-    }
-
-    const pilares = getPilares();
-    const data = auditData[selectedSucursal];
-
-    let informe = `INFORME DE AUDITORÍA\n`;
-    informe += `Sucursal: ${selectedSucursal}\n`;
-    informe += `Fecha: ${selectedDate.toLocaleDateString()}\n`;
-    informe += `\n${'='.repeat(50)}\n\n`;
-
-    Object.entries(pilares).forEach(([key, pilar]) => {
-      const pilarData = data[key];
-      if (!pilarData) return;
-
-      informe += `${pilar.nombre}\n`;
-      informe += `-`.repeat(50) + '\n';
-      informe += `Estado: ${pilarData.estado === null ? 'PENDIENTE' : (pilarData.estado ? 'APROBADO' : 'NO APROBADO')}\n`;
-
-      if (pilarData.tieneHallazgo) {
-        informe += `Criticidad: ${pilarData.criticidad.toUpperCase()}\n`;
-      }
-
-      informe += `\nItems de verificación:\n`;
-      pilar.items.forEach((item, idx) => {
-        const estado = pilarData.items[idx];
-        informe += `${estado === true ? '[✓]' : estado === false ? '[✗]' : '[ ]'} ${item.text}\n`;
-      });
-
-      // Ponderación ponderada
-      const pond = calcPonderacion(key, pilar);
-      if (pond) {
-        informe += `\nPonderación del Pilar: ${pond.porcentaje}% (${pond.evaluados}/${pond.total} items evaluados)\n`;
-      }
-
-      if (pilarData.observaciones) {
-        informe += `\nObservaciones: ${pilarData.observaciones}\n`;
-      }
-
-      if (pilarData.imagenes.length > 0) {
-        informe += `\nImágenes adjuntas: ${pilarData.imagenes.length}\n`;
-      }
-
-      informe += '\n' + '='.repeat(50) + '\n\n';
-    });
-
-    // Crear y descargar archivo
-    const blob = new Blob([informe], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Auditoria_${selectedSucursal}_${selectedDate.toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const pilares = getPilares();
 
   // Mes key para filtrar datos
@@ -650,14 +589,20 @@ const Checklist = () => {
     };
   };
 
-  // Generar informe snapshot
-  const handleGenerarInforme = async () => {
+  // Abrir modal de selección de tipo de informe
+  const handleAbrirTipoInforme = () => {
     const auditoresValidos = auditoresLocal.filter(a => a.trim());
     if (auditoresValidos.length === 0) {
       alert('Debe ingresar al menos un auditor antes de generar el informe.');
       return;
     }
+    setTipoInformeModal(true);
+    setTipoInformeSeleccionado(null);
+  };
 
+  // Generar informe snapshot con tipo seleccionado
+  const handleGenerarInforme = async (tipoInforme) => {
+    setTipoInformeModal(false);
     setGenerandoInforme(true);
     const pilaresData = auditData[selectedSucursal];
     const resumen = calcResumen();
@@ -671,17 +616,19 @@ const Checklist = () => {
     });
 
     try {
-      const report = await generateReport(selectedSucursal, mesKey, pilaresData, resumen, pilarScores);
+      const report = await generateReport(selectedSucursal, mesKey, pilaresData, resumen, pilarScores, tipoInforme);
       setGenerandoInforme(false);
 
       if (report) {
-        const goToReport = confirm(`Informe ${report.id} generado exitosamente.\n\n¿Desea ir a Reportes para verlo?`);
+        const tipoLabel = tipoInforme === 'preliminar' ? 'Preliminar' : 'Final';
+        const goToReport = confirm(`Informe ${tipoLabel} (${report.id}) generado exitosamente.\n\n¿Desea ir a Reportes para verlo?`);
         if (goToReport) {
           navigate('/reportes');
         }
       }
     } catch (err) {
       console.error('Error generando informe:', err);
+      alert(err.message || 'Error al generar el informe.');
       setGenerandoInforme(false);
     }
   };
@@ -731,15 +678,6 @@ const Checklist = () => {
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-mascotera-accent/20 text-mascotera-accent">AUDITOR</span>
             )}
           </div>
-          {selectedSucursal && (
-            <button
-              onClick={exportarInforme}
-              className="btn-secondary flex items-center gap-2 text-sm"
-            >
-              <Download className="w-4 h-4" />
-              Exportar TXT
-            </button>
-          )}
         </div>
       </div>
 
@@ -1554,29 +1492,50 @@ const Checklist = () => {
           })}
 
           {/* Botón Generar Informe (solo auditor) */}
-          {isAuditor && allPilaresComplete() && (
-            <div className="card-mascotera border-mascotera-success/50 bg-mascotera-success/5">
+          {isAuditor && allPilaresComplete() && (() => {
+            const reportStatus = getReportTypesForSucursalMes(selectedSucursal, mesKey);
+            const canGenerate = reportStatus.count < 2;
+            return (
+            <div className={`card-mascotera ${canGenerate ? 'border-mascotera-success/50 bg-mascotera-success/5' : 'border-mascotera-warning/50 bg-mascotera-warning/5'}`}>
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-mascotera-success/20">
-                  <FileCheck className="w-8 h-8 text-mascotera-success" />
+                <div className={`p-3 rounded-lg ${canGenerate ? 'bg-mascotera-success/20' : 'bg-mascotera-warning/20'}`}>
+                  <FileCheck className={`w-8 h-8 ${canGenerate ? 'text-mascotera-success' : 'text-mascotera-warning'}`} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-mascotera-success">Auditoría Completa</h3>
+                  <h3 className={`text-lg font-bold ${canGenerate ? 'text-mascotera-success' : 'text-mascotera-warning'}`}>
+                    {canGenerate ? 'Auditoría Completa' : 'Límite de Informes Alcanzado'}
+                  </h3>
                   <p className="text-sm text-mascotera-text-muted mt-1">
-                    Todos los pilares han sido evaluados. Puede generar el informe oficial de auditoría.
+                    {canGenerate
+                      ? `Todos los pilares han sido evaluados. Puede generar el informe ${!reportStatus.hasPreliminar ? 'preliminar' : 'final'}.`
+                      : 'Ya se generaron los 2 informes permitidos para este período (preliminar y final).'
+                    }
                   </p>
+                  {reportStatus.count > 0 && (
+                    <div className="flex gap-2 mt-2">
+                      {reportStatus.hasPreliminar && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-mascotera-info/20 text-mascotera-info">Preliminar generado</span>
+                      )}
+                      {reportStatus.hasFinal && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-mascotera-accent/20 text-mascotera-accent">Final generado</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={handleGenerarInforme}
-                  disabled={generandoInforme}
-                  className={`btn-primary flex items-center gap-2 ${generandoInforme ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <FileCheck className="w-5 h-5" />
-                  {generandoInforme ? 'Generando...' : 'Generar Informe'}
-                </button>
+                {canGenerate && (
+                  <button
+                    onClick={handleAbrirTipoInforme}
+                    disabled={generandoInforme}
+                    className={`btn-primary flex items-center gap-2 ${generandoInforme ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <FileCheck className="w-5 h-5" />
+                    {generandoInforme ? 'Generando...' : 'Generar Informe'}
+                  </button>
+                )}
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
@@ -1591,6 +1550,101 @@ const Checklist = () => {
             <p className="text-mascotera-text-muted max-w-sm">
               Elige una sucursal del menú desplegable para comenzar la auditoría de pilares
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Selección Tipo de Informe */}
+      {tipoInformeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-mascotera-card rounded-xl max-w-md w-full border border-mascotera-border shadow-2xl">
+            <div className="p-6 border-b border-mascotera-border">
+              <h2 className="text-xl font-bold text-mascotera-text">Seleccionar Tipo de Informe</h2>
+              <p className="text-sm text-mascotera-text-muted mt-1">
+                Se permiten 2 informes por mes: uno preliminar y uno final.
+              </p>
+            </div>
+            <div className="p-6 space-y-3">
+              {(() => {
+                const reportStatus = getReportTypesForSucursalMes(selectedSucursal, mesKey);
+                return (
+                  <>
+                    <button
+                      onClick={() => setTipoInformeSeleccionado('preliminar')}
+                      disabled={reportStatus.hasPreliminar}
+                      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                        reportStatus.hasPreliminar
+                          ? 'border-mascotera-border bg-mascotera-darker/30 opacity-50 cursor-not-allowed'
+                          : tipoInformeSeleccionado === 'preliminar'
+                            ? 'border-mascotera-info bg-mascotera-info/10'
+                            : 'border-mascotera-border bg-mascotera-darker hover:border-mascotera-info/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className={`font-semibold ${reportStatus.hasPreliminar ? 'text-mascotera-text-muted' : 'text-mascotera-text'}`}>
+                            Informe Preliminar
+                          </h4>
+                          <p className="text-xs text-mascotera-text-muted mt-1">
+                            {reportStatus.hasPreliminar
+                              ? 'Ya fue generado para este período'
+                              : 'Primera evaluación del período - puede ser seguido por el informe final'
+                            }
+                          </p>
+                        </div>
+                        {reportStatus.hasPreliminar && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-mascotera-info/20 text-mascotera-info">Generado</span>
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setTipoInformeSeleccionado('final')}
+                      disabled={reportStatus.hasFinal}
+                      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                        reportStatus.hasFinal
+                          ? 'border-mascotera-border bg-mascotera-darker/30 opacity-50 cursor-not-allowed'
+                          : tipoInformeSeleccionado === 'final'
+                            ? 'border-mascotera-accent bg-mascotera-accent/10'
+                            : 'border-mascotera-border bg-mascotera-darker hover:border-mascotera-accent/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className={`font-semibold ${reportStatus.hasFinal ? 'text-mascotera-text-muted' : 'text-mascotera-text'}`}>
+                            Informe Final
+                          </h4>
+                          <p className="text-xs text-mascotera-text-muted mt-1">
+                            {reportStatus.hasFinal
+                              ? 'Ya fue generado para este período'
+                              : 'Evaluación definitiva del período - cierre de la auditoría mensual'
+                            }
+                          </p>
+                        </div>
+                        {reportStatus.hasFinal && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-mascotera-accent/20 text-mascotera-accent">Generado</span>
+                        )}
+                      </div>
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="p-6 border-t border-mascotera-border flex items-center justify-end gap-3">
+              <button
+                onClick={() => setTipoInformeModal(false)}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => tipoInformeSeleccionado && handleGenerarInforme(tipoInformeSeleccionado)}
+                disabled={!tipoInformeSeleccionado}
+                className={`btn-primary flex items-center gap-2 ${!tipoInformeSeleccionado ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <FileCheck className="w-5 h-5" />
+                Generar Informe
+              </button>
+            </div>
           </div>
         </div>
       )}
