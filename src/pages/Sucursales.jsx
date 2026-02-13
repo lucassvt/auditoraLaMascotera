@@ -48,66 +48,8 @@ const Sucursales = () => {
     { key: 'mantenimientoVehiculos', nombre: 'Mant. Vehículos' }
   ];
 
-  // Datos históricos por sucursal: 6 meses de resultados por pilar
-  // true = aprobado, false = desaprobado, null = pendiente/no evaluado
-  const historico = {
-    'LEGUIZAMON': {
-      ordenLimpieza:          [true,  true,  true,  true,  true,  true],
-      serviciosClub:          [true,  true,  false, false, true,  true],
-      gestionAdministrativa:  [true,  true,  true,  true,  true,  true],
-      pedidosYa:              [true,  false, true,  true,  true,  true],
-      stockCaja:              [false, true,  true,  false, false, true]
-    },
-    'CATAMARCA': {
-      ordenLimpieza:          [true,  true,  true,  true,  true,  true],
-      serviciosClub:          [true,  true,  true,  true,  true,  true],
-      gestionAdministrativa:  [false, true,  true,  true,  true,  true],
-      pedidosYa:              [true,  true,  false, false, true,  true],
-      stockCaja:              [true,  true,  true,  true,  true,  true]
-    },
-    'CONGRESO': {
-      ordenLimpieza:          [false, true,  false, false, true,  true],
-      serviciosClub:          [true,  true,  true,  true,  false, true],
-      gestionAdministrativa:  [true,  false, true,  false, true,  true],
-      pedidosYa:              [true,  true,  true,  true,  true,  true],
-      stockCaja:              [false, false, false, false, false, false]
-    },
-    'ARENALES': {
-      ordenLimpieza:          [true,  true,  true,  true,  false, true],
-      serviciosClub:          [false, false, false, true,  true,  false],
-      gestionAdministrativa:  [true,  true,  true,  true,  true,  true],
-      pedidosYa:              [false, false, true,  true,  false, false],
-      stockCaja:              [true,  true,  false, false, true,  true]
-    },
-    'BELGRANO SUR': {
-      ordenLimpieza:          [false, false, false, false, false, false],
-      serviciosClub:          [false, true,  false, false, true,  true],
-      gestionAdministrativa:  [true,  false, true,  true,  false, true],
-      pedidosYa:              [true,  true,  true,  true,  true,  true],
-      stockCaja:              [false, false, false, false, false, false]
-    },
-    'LAPRIDA': {
-      ordenLimpieza:          [false, false, false, false, false, false],
-      serviciosClub:          [false, false, false, false, false, true],
-      gestionAdministrativa:  [false, false, true,  false, false, false],
-      pedidosYa:              [true,  false, false, false, true,  true],
-      stockCaja:              [false, false, false, false, false, false]
-    },
-    'VILLA CRESPO': {
-      ordenLimpieza:          [true,  true,  true,  true,  null,  null],
-      serviciosClub:          [true,  true,  false, true,  null,  null],
-      gestionAdministrativa:  [true,  true,  true,  true,  null,  null],
-      pedidosYa:              [true,  true,  true,  true,  null,  null],
-      stockCaja:              [false, true,  true,  false, null,  null]
-    },
-    'DEPOSITO RUTA 9': {
-      ordenLimpieza:          [true,  true,  true,  true,  true,  true],
-      gestionAdministrativa:  [true,  true,  true,  true,  true,  true],
-      stockCaja:              [true,  false, true,  true,  false, true],
-      gestionPedidos:         [true,  true,  true,  true,  true,  true],
-      mantenimientoVehiculos: [true,  true,  false, true,  true,  true]
-    }
-  };
+  // Datos históricos por sucursal (se llenarán con datos reales del backend)
+  const historico = {};
 
   // Analizar patrones de un pilar
   const analizarPatron = (resultados) => {
@@ -205,10 +147,7 @@ const Sucursales = () => {
     };
   };
 
-  const sucursalesBase = sucursalesNombres.length > 0 ? sucursalesNombres : [
-    'LEGUIZAMON', 'CATAMARCA', 'CONGRESO', 'ARENALES',
-    'BELGRANO SUR', 'LAPRIDA'
-  ];
+  const sucursalesBase = sucursalesNombres;
 
   // Ordenar: más patrones críticos primero, luego menor cumplimiento
   const sucursalesList = [...sucursalesBase].sort((a, b) => {

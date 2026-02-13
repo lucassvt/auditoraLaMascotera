@@ -116,10 +116,7 @@ const Dashboard = () => {
   const prevMonthData = history[prevMesKey] || {};
 
   // Lista de sucursales
-  const sucursalesList = sucursalesNombres.length > 0 ? sucursalesNombres : [
-    'LEGUIZAMON', 'CATAMARCA', 'CONGRESO', 'ARENALES',
-    'BELGRANO SUR', 'LAPRIDA'
-  ];
+  const sucursalesList = sucursalesNombres;
 
   // --- Calcular desempeño por sucursal ---
   const sucursalesDesempeno = sucursalesList.map(sucursal => {
