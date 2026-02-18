@@ -124,6 +124,16 @@ const Reportes = () => {
     'critica': 'critica'
   };
 
+  const pilaresNombres = {
+    ordenLimpieza: 'Orden y Limpieza',
+    serviciosClub: 'Servicios y Club',
+    gestionAdministrativa: 'Gestión Administrativa',
+    pedidosYa: 'Pedidos Ya / WhatsApp',
+    stockCaja: 'Stock y Caja',
+    gestionPedidos: 'Gestión de Pedidos',
+    mantenimientoVehiculos: 'Mant. Vehículos'
+  };
+
   // Obtener hallazgos de auditorías (pilar-level: NO APROBADO)
   const auditHallazgos = getAllHallazgos().map(h => ({
     id: h.id,
@@ -194,17 +204,6 @@ const Reportes = () => {
   };
 
   // --- Datos históricos para detección de patrones negativos ---
-  const pilaresNombres = {
-    ordenLimpieza: 'Orden y Limpieza',
-    serviciosClub: 'Servicios y Club',
-    gestionAdministrativa: 'Gestión Administrativa',
-    pedidosYa: 'Pedidos Ya / WhatsApp',
-    stockCaja: 'Stock y Caja',
-    gestionPedidos: 'Gestión de Pedidos',
-    mantenimientoVehiculos: 'Mant. Vehículos'
-  };
-
-
   const historicoPatrones = {};
   const analizarPatron = (resultados) => {
     const evaluados = resultados.filter(r => r !== null);

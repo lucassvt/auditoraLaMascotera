@@ -133,6 +133,33 @@ export const AuditProvider = ({ children }) => {
     localStorage.setItem('audit_generated_reports', JSON.stringify(generatedReports));
   }, [generatedReports]);
 
+  // Limpieza única: datos de prueba de DEPOSITO RUTA 9
+  useEffect(() => {
+    const SUC = 'DEPOSITO RUTA 9';
+    // Limpiar estado en memoria
+    setAuditData(prev => {
+      if (!(SUC in prev)) return prev;
+      const { [SUC]: _, ...rest } = prev;
+      return rest;
+    });
+    setAuditoresPorSucursal(prev => {
+      if (!(SUC in prev)) return prev;
+      const { [SUC]: _, ...rest } = prev;
+      return rest;
+    });
+    setGeneratedReports(prev => {
+      const filtered = prev.filter(r => r.sucursal !== SUC);
+      return filtered.length === prev.length ? prev : filtered;
+    });
+    // Limpiar audit_pilar_history (leído directamente por Dashboard)
+    try {
+      const h = JSON.parse(localStorage.getItem('audit_pilar_history') || '{}');
+      let changed = false;
+      Object.keys(h).forEach(mes => { if (h[mes][SUC]) { delete h[mes][SUC]; changed = true; } });
+      if (changed) localStorage.setItem('audit_pilar_history', JSON.stringify(h));
+    } catch {}
+  }, []);
+
   // Fetch sucursales desde la API
   useEffect(() => {
     fetch(`${API_BASE}/sucursales`)

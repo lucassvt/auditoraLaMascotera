@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Bell,
   User,
-  Search,
   LogOut,
   Settings,
   MessageSquare,
@@ -394,14 +393,6 @@ const Layout = ({ children }) => {
         {/* Header */}
         <header className="h-16 bg-mascotera-darker border-b border-mascotera-border flex items-center justify-between px-6">
           <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-mascotera-text-muted" />
-              <input
-                type="text"
-                placeholder="Buscar auditorias, reportes..."
-                className="input-mascotera pl-10 w-80"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-4">
