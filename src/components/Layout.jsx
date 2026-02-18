@@ -21,9 +21,12 @@ import {
   EyeOff,
   AlertCircle,
   Shield,
-  Package
+  Package,
+  Users,
+  X
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
+import { API_BASE } from '../config';
 
 const formatTimeAgo = (dateStr) => {
   if (!dateStr) return '';
@@ -43,7 +46,13 @@ const formatTimeAgo = (dateStr) => {
 const Layout = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [accessUsers, setAccessUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [updatingRole, setUpdatingRole] = useState(null);
   const notifRef = useRef(null);
+  const settingsRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { descargos, conteosPendientes, currentUser, loginUser, logoutUser, userDisplayName, isAuditor, isPilaresOnly } = useAudit();
@@ -58,16 +67,57 @@ const Layout = ({ children }) => {
   const descargosPendientes = descargos.filter(d => d.estado === 'pendiente');
   const totalNotificaciones = descargosPendientes.length + conteosPendientes.length;
 
-  // Cerrar dropdown al hacer clic fuera
+  // Cerrar dropdowns al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
         setNotifOpen(false);
       }
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setSettingsOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Cargar usuarios con acceso al sistema
+  const fetchAccessUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/users`);
+      const data = await res.json();
+      setAccessUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error cargando usuarios:', err);
+    }
+    setLoadingUsers(false);
+  };
+
+  // Cambiar nivel de acceso de un usuario
+  const updateUserRole = async (userId, newRole) => {
+    setUpdatingRole(userId);
+    try {
+      const res = await fetch(`${API_BASE}/auth/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_level: newRole })
+      });
+      if (res.ok) {
+        setAccessUsers(prev => prev.map(u => u.id === userId ? { ...u, accessLevel: newRole } : u));
+      }
+    } catch (err) {
+      console.error('Error actualizando rol:', err);
+    }
+    setUpdatingRole(null);
+  };
+
+  // Abrir modal de gestión de accesos
+  const openAccessModal = () => {
+    setSettingsOpen(false);
+    setAccessModalOpen(true);
+    fetchAccessUsers();
+  };
 
   // Redirigir usuarios pilares_only a /checklist si intentan otra ruta
   useEffect(() => {
@@ -491,6 +541,53 @@ const Layout = ({ children }) => {
               )}
             </div>
 
+            {/* Settings */}
+            <div className="relative" ref={settingsRef}>
+              <button
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                className="p-2 text-mascotera-text-muted hover:text-mascotera-accent transition-colors"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+
+              {settingsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-mascotera-card border border-mascotera-border rounded-xl shadow-2xl z-50 overflow-hidden">
+                  <div className="bg-mascotera-darker px-4 py-3 border-b border-mascotera-border">
+                    <h3 className="font-semibold text-mascotera-text text-sm">Configuraci&oacute;n</h3>
+                  </div>
+
+                  <div className="py-1">
+                    {isAuditor && (
+                      <button
+                        onClick={openAccessModal}
+                        className="w-full text-left px-4 py-3 hover:bg-mascotera-darker/50 transition-colors flex items-center gap-3"
+                      >
+                        <Users className="w-4 h-4 text-mascotera-accent" />
+                        <div>
+                          <p className="text-sm font-medium text-mascotera-text">Gestionar Accesos</p>
+                          <p className="text-[10px] text-mascotera-text-muted">Niveles de acceso del sistema</p>
+                        </div>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        logoutUser();
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-mascotera-danger/10 transition-colors flex items-center gap-3 border-t border-mascotera-border/30"
+                    >
+                      <LogOut className="w-4 h-4 text-mascotera-danger" />
+                      <div>
+                        <p className="text-sm font-medium text-mascotera-danger">Cerrar Sesi&oacute;n</p>
+                        <p className="text-[10px] text-mascotera-text-muted">{userDisplayName}</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* User Menu */}
             <div className="flex items-center gap-3 pl-4 border-l border-mascotera-border">
               <div className="text-right">
@@ -509,6 +606,141 @@ const Layout = ({ children }) => {
           {children}
         </main>
       </div>
+
+      {/* Modal Gestión de Accesos */}
+      {accessModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-mascotera-dark border border-mascotera-border rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-mascotera-darker px-6 py-4 border-b border-mascotera-border flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-mascotera-accent/20 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-mascotera-accent" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-mascotera-text">Gesti&oacute;n de Accesos</h2>
+                  <p className="text-xs text-mascotera-text-muted">Usuarios con permiso al sistema de Auditor&iacute;a</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAccessModalOpen(false)}
+                className="p-2 text-mascotera-text-muted hover:text-mascotera-text transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Leyenda de niveles */}
+            <div className="px-6 py-3 bg-mascotera-darker/50 border-b border-mascotera-border/30 flex items-center gap-4 flex-wrap flex-shrink-0">
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-mascotera-accent"></span>
+                <span className="text-mascotera-text-muted">Auditor</span>
+                <span className="text-mascotera-text-muted opacity-50">- Acceso total + control</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-mascotera-success"></span>
+                <span className="text-mascotera-text-muted">Completo</span>
+                <span className="text-mascotera-text-muted opacity-50">- Todos los m&oacute;dulos</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-mascotera-info"></span>
+                <span className="text-mascotera-text-muted">Observador</span>
+                <span className="text-mascotera-text-muted opacity-50">- Solo pilares</span>
+              </span>
+            </div>
+
+            {/* Lista de usuarios */}
+            <div className="flex-1 overflow-y-auto">
+              {loadingUsers ? (
+                <div className="py-12 text-center">
+                  <div className="w-8 h-8 border-2 border-mascotera-accent/30 border-t-mascotera-accent rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="text-sm text-mascotera-text-muted">Cargando usuarios...</p>
+                </div>
+              ) : accessUsers.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Users className="w-10 h-10 text-mascotera-text-muted mx-auto mb-3 opacity-40" />
+                  <p className="text-sm text-mascotera-text-muted">No se encontraron usuarios</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-mascotera-border/30">
+                  {accessUsers.map(user => {
+                    const isCurrentUser = user.id === currentUser.id;
+                    const nombre = `${user.nombre} ${user.apellido}`.replace(/\b\w+/g, w => w.charAt(0) + w.slice(1).toLowerCase());
+                    return (
+                      <div key={user.id} className={`px-6 py-4 flex items-center justify-between gap-4 ${!user.activo ? 'opacity-50' : ''}`}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            user.accessLevel === 'auditor' ? 'bg-mascotera-accent/20' :
+                            user.accessLevel === 'pilares_only' ? 'bg-mascotera-info/20' :
+                            'bg-mascotera-success/20'
+                          }`}>
+                            <User className={`w-4 h-4 ${
+                              user.accessLevel === 'auditor' ? 'text-mascotera-accent' :
+                              user.accessLevel === 'pilares_only' ? 'text-mascotera-info' :
+                              'text-mascotera-success'
+                            }`} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-mascotera-text truncate">{nombre}</p>
+                              {isCurrentUser && (
+                                <span className="text-[10px] bg-mascotera-accent/20 text-mascotera-accent px-1.5 py-0.5 rounded font-bold">T&uacute;</span>
+                              )}
+                              {!user.activo && (
+                                <span className="text-[10px] bg-mascotera-danger/20 text-mascotera-danger px-1.5 py-0.5 rounded font-bold">Inactivo</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-mascotera-text-muted truncate">
+                              {user.puesto || user.rol}{user.sucursal ? ` · ${user.sucursal}` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex-shrink-0 relative">
+                          {updatingRole === user.id ? (
+                            <div className="w-5 h-5 border-2 border-mascotera-accent/30 border-t-mascotera-accent rounded-full animate-spin"></div>
+                          ) : (
+                            <select
+                              value={user.accessLevel}
+                              onChange={(e) => updateUserRole(user.id, e.target.value)}
+                              disabled={isCurrentUser}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border appearance-none pr-7 cursor-pointer ${
+                                user.accessLevel === 'auditor'
+                                  ? 'bg-mascotera-accent/10 border-mascotera-accent/30 text-mascotera-accent'
+                                  : user.accessLevel === 'pilares_only'
+                                  ? 'bg-mascotera-info/10 border-mascotera-info/30 text-mascotera-info'
+                                  : 'bg-mascotera-success/10 border-mascotera-success/30 text-mascotera-success'
+                              } ${isCurrentUser ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-80'}`}
+                              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
+                            >
+                              <option value="auditor">Auditor</option>
+                              <option value="full">Acceso Completo</option>
+                              <option value="pilares_only">Observador</option>
+                            </select>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-mascotera-darker border-t border-mascotera-border flex items-center justify-between flex-shrink-0">
+              <p className="text-[11px] text-mascotera-text-muted">
+                {accessUsers.length} usuario{accessUsers.length !== 1 ? 's' : ''} con acceso
+              </p>
+              <button
+                onClick={() => setAccessModalOpen(false)}
+                className="px-4 py-2 bg-mascotera-card text-mascotera-text text-sm font-medium rounded-lg hover:bg-mascotera-border transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

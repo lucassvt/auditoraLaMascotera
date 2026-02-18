@@ -7,9 +7,9 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { createTunnel, LOCAL_PORT } = require('./ssh-tunnel');
 
-// Access level config for Auditoría system
-const AUDITOR_IDS = [50]; // Santiago Rivero
-const PILARES_ONLY_IDS = [1681, 1689]; // Mayra Fernanda Alias Rita, Maia Sol Gongora
+// Default access level config (fallback if DB table not populated)
+const DEFAULT_AUDITOR_IDS = [50]; // Santiago Rivero
+const DEFAULT_PILARES_ONLY_IDS = [1681, 1689]; // Mayra Fernanda Alias Rita, Maia Sol Gongora
 
 const app = express();
 app.use(cors());
@@ -712,7 +712,158 @@ app.delete('/api/observaciones/:id', async (req, res) => {
   }
 });
 
-// ========== AUTENTICACIÓN ==========
+// ========== AUTENTICACIÓN Y GESTIÓN DE ACCESOS ==========
+
+// Crear tabla de roles de auditoría si no existe
+async function initRolesTable() {
+  try {
+    await poolMiSucursal.query(`
+      CREATE TABLE IF NOT EXISTS auditoria_roles (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL UNIQUE,
+        access_level VARCHAR(20) NOT NULL DEFAULT 'full',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed con roles por defecto si la tabla está vacía
+    const countResult = await poolMiSucursal.query(`SELECT COUNT(*) FROM auditoria_roles`);
+    if (parseInt(countResult.rows[0].count) === 0) {
+      // Insertar auditor por defecto
+      for (const id of DEFAULT_AUDITOR_IDS) {
+        await poolMiSucursal.query(
+          `INSERT INTO auditoria_roles (employee_id, access_level) VALUES ($1, 'auditor') ON CONFLICT (employee_id) DO NOTHING`,
+          [id]
+        );
+      }
+      // Insertar pilares_only por defecto
+      for (const id of DEFAULT_PILARES_ONLY_IDS) {
+        await poolMiSucursal.query(
+          `INSERT INTO auditoria_roles (employee_id, access_level) VALUES ($1, 'pilares_only') ON CONFLICT (employee_id) DO NOTHING`,
+          [id]
+        );
+      }
+      console.log('Roles por defecto insertados en auditoria_roles');
+    }
+
+    console.log('Tabla auditoria_roles verificada/creada');
+  } catch (err) {
+    console.error('Error creando tabla auditoria_roles:', err.message);
+  }
+}
+
+// Helper: obtener access level de un employee
+async function getAccessLevel(employeeId) {
+  try {
+    const result = await poolMiSucursal.query(
+      `SELECT access_level FROM auditoria_roles WHERE employee_id = $1`,
+      [employeeId]
+    );
+    if (result.rows.length > 0) return result.rows[0].access_level;
+
+    // Fallback a defaults hardcodeados
+    if (DEFAULT_AUDITOR_IDS.includes(employeeId)) return 'auditor';
+    if (DEFAULT_PILARES_ONLY_IDS.includes(employeeId)) return 'pilares_only';
+    return 'full';
+  } catch {
+    // Fallback si la tabla no existe
+    if (DEFAULT_AUDITOR_IDS.includes(employeeId)) return 'auditor';
+    if (DEFAULT_PILARES_ONLY_IDS.includes(employeeId)) return 'pilares_only';
+    return 'full';
+  }
+}
+
+// GET /api/auth/users - listar todos los usuarios con acceso a Auditoría
+app.get('/api/auth/users', async (req, res) => {
+  try {
+    // Obtener todos los employees con permiso para sistema_id=11
+    const permResult = await poolDuxIntegrada.query(`
+      SELECT p.employee_id
+      FROM permisos_usuario_sistema p
+      WHERE p.sistema_id = 11 AND p.activo = true
+    `);
+
+    if (permResult.rows.length === 0) return res.json([]);
+
+    const empIds = permResult.rows.map(r => r.employee_id);
+
+    // Obtener datos de los employees
+    const empResult = await poolDuxIntegrada.query(
+      `SELECT id, nombre, apellido, usuario, rol, puesto, sucursal_id, activo
+       FROM employees WHERE id = ANY($1) ORDER BY nombre`,
+      [empIds]
+    );
+
+    // Obtener roles de auditoría
+    const rolesResult = await poolMiSucursal.query(
+      `SELECT employee_id, access_level FROM auditoria_roles WHERE employee_id = ANY($1)`,
+      [empIds]
+    );
+    const rolesMap = {};
+    rolesResult.rows.forEach(r => { rolesMap[r.employee_id] = r.access_level; });
+
+    // Obtener nombres de sucursales
+    const sucIds = [...new Set(empResult.rows.map(e => e.sucursal_id).filter(Boolean))];
+    let sucMap = {};
+    if (sucIds.length > 0) {
+      const sucResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre FROM sucursales WHERE id = ANY($1)`, [sucIds]
+      );
+      sucResult.rows.forEach(s => { sucMap[s.id] = s.nombre.replace(/^SUCURSAL\s+/i, ''); });
+    }
+
+    const users = empResult.rows.map(emp => {
+      let accessLevel = rolesMap[emp.id] || 'full';
+      // Fallback para roles no guardados en DB
+      if (!rolesMap[emp.id]) {
+        if (DEFAULT_AUDITOR_IDS.includes(emp.id)) accessLevel = 'auditor';
+        else if (DEFAULT_PILARES_ONLY_IDS.includes(emp.id)) accessLevel = 'pilares_only';
+      }
+      return {
+        id: emp.id,
+        nombre: emp.nombre,
+        apellido: emp.apellido,
+        usuario: emp.usuario,
+        rol: emp.rol,
+        puesto: emp.puesto,
+        sucursal: sucMap[emp.sucursal_id] || null,
+        activo: emp.activo,
+        accessLevel
+      };
+    });
+
+    res.json(users);
+  } catch (err) {
+    console.error('Error listando usuarios:', err.message);
+    res.status(500).json({ error: 'Error al listar usuarios' });
+  }
+});
+
+// PATCH /api/auth/users/:id/role - cambiar nivel de acceso de un usuario
+app.patch('/api/auth/users/:id/role', async (req, res) => {
+  const { id } = req.params;
+  const { access_level } = req.body;
+
+  if (!access_level || !['auditor', 'full', 'pilares_only'].includes(access_level)) {
+    return res.status(400).json({ error: 'access_level debe ser "auditor", "full" o "pilares_only"' });
+  }
+
+  try {
+    // Upsert en auditoria_roles
+    await poolMiSucursal.query(`
+      INSERT INTO auditoria_roles (employee_id, access_level, updated_at)
+      VALUES ($1, $2, CURRENT_TIMESTAMP)
+      ON CONFLICT (employee_id)
+      DO UPDATE SET access_level = $2, updated_at = CURRENT_TIMESTAMP
+    `, [parseInt(id), access_level]);
+
+    res.json({ success: true, employee_id: parseInt(id), access_level });
+  } catch (err) {
+    console.error('Error actualizando rol:', err.message);
+    res.status(500).json({ error: 'Error al actualizar nivel de acceso' });
+  }
+});
 
 // POST /api/auth/login - login contra employees + permisos de Auditoría
 app.post('/api/auth/login', async (req, res) => {
@@ -754,10 +905,8 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para acceder al sistema de Auditoría' });
     }
 
-    // Determinar nivel de acceso
-    let accessLevel = 'full';
-    if (AUDITOR_IDS.includes(employee.id)) accessLevel = 'auditor';
-    else if (PILARES_ONLY_IDS.includes(employee.id)) accessLevel = 'pilares_only';
+    // Determinar nivel de acceso desde DB
+    const accessLevel = await getAccessLevel(employee.id);
 
     res.json({
       id: employee.id,
@@ -784,6 +933,7 @@ const PORT = process.env.PORT || 3002;
 
 initDB().then(async () => {
   await initObservacionesTable();
+  await initRolesTable();
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`API corriendo en puerto ${PORT}`);
   });
