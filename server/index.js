@@ -540,6 +540,114 @@ app.delete('/api/informes/:id', async (req, res) => {
   }
 });
 
+// ========== PEDIDOS PENDIENTES (Gestión Administrativa) ==========
+
+// GET /api/pedidos-pendientes - resumen de pedidos pendientes de facturar y transferencias pendientes por sucursal
+app.get('/api/pedidos-pendientes', async (req, res) => {
+  try {
+    const { mes } = req.query; // formato: 2026-01
+    if (!mes) {
+      return res.status(400).json({ error: 'El parámetro mes es requerido (formato: YYYY-MM)' });
+    }
+
+    const [year, month] = mes.split('-');
+    const startDate = `${year}-${month}-01`;
+    const endMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+    const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+    const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+    const result = await poolDuxIntegrada.query(`
+      SELECT
+        id_sucursal AS sucursal_id,
+        COUNT(*) FILTER (WHERE estado_facturacion IN ('PENDIENTE', 'FACTURADO_PARCIAL')) AS pendientes_facturar,
+        COALESCE(SUM(CASE WHEN estado_facturacion IN ('PENDIENTE', 'FACTURADO_PARCIAL') THEN CAST(NULLIF(total, '') AS numeric) ELSE 0 END), 0) AS monto_pendiente_facturar,
+        COUNT(*) FILTER (WHERE estado_remito IN ('PENDIENTE', 'REMITO_PARCIAL')) AS transferencias_pendientes,
+        COALESCE(SUM(CASE WHEN estado_remito IN ('PENDIENTE', 'REMITO_PARCIAL') THEN CAST(NULLIF(total, '') AS numeric) ELSE 0 END), 0) AS monto_transferencias_pendientes
+      FROM pedidos
+      WHERE (anulado_boolean IS NOT TRUE OR anulado_boolean IS NULL)
+        AND fecha::timestamp >= $1
+        AND fecha::timestamp < $2
+      GROUP BY id_sucursal
+      ORDER BY id_sucursal
+    `, [startDate, endDate]);
+
+    // Enrich with sucursal names
+    if (result.rows.length > 0) {
+      const sucIds = [...new Set(result.rows.map(r => r.sucursal_id))];
+      const sucResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre FROM sucursales WHERE id = ANY($1)`, [sucIds]
+      );
+      const sucMap = {};
+      sucResult.rows.forEach(s => { sucMap[s.id] = s.nombre; });
+      result.rows.forEach(r => {
+        r.sucursal_nombre = sucMap[r.sucursal_id] || `Sucursal #${r.sucursal_id}`;
+      });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error consultando pedidos pendientes:', err.message);
+    res.status(500).json({ error: 'Error al consultar pedidos pendientes' });
+  }
+});
+
+// ========== PEDIDOS YA (Gestión de Pedidos) ==========
+
+// GET /api/pedidos-ya - porcentaje de pedidos de Pedidos Ya por sucursal en un mes
+app.get('/api/pedidos-ya', async (req, res) => {
+  try {
+    const { mes } = req.query; // formato: 2026-01
+    if (!mes) {
+      return res.status(400).json({ error: 'El parámetro mes es requerido (formato: YYYY-MM)' });
+    }
+
+    const [year, month] = mes.split('-');
+    const startDate = `${year}-${month}-01`;
+    const endMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+    const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+    const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+    const result = await poolDuxIntegrada.query(`
+      SELECT
+        id_sucursal AS sucursal_id,
+        COUNT(*) AS total_pedidos,
+        COUNT(*) FILTER (WHERE UPPER(cliente) LIKE '%PEDIDOS YA%') AS pedidos_ya,
+        COALESCE(SUM(CAST(NULLIF(total, '') AS numeric)), 0) AS monto_total,
+        COALESCE(SUM(CASE WHEN UPPER(cliente) LIKE '%PEDIDOS YA%' THEN CAST(NULLIF(total, '') AS numeric) ELSE 0 END), 0) AS monto_pedidos_ya,
+        ROUND(
+          CASE WHEN COUNT(*) > 0
+            THEN (COUNT(*) FILTER (WHERE UPPER(cliente) LIKE '%PEDIDOS YA%'))::numeric / COUNT(*)::numeric * 100
+            ELSE 0
+          END, 1
+        ) AS porcentaje_pedidos_ya
+      FROM pedidos
+      WHERE (anulado_boolean IS NOT TRUE OR anulado_boolean IS NULL)
+        AND fecha::timestamp >= $1
+        AND fecha::timestamp < $2
+      GROUP BY id_sucursal
+      ORDER BY id_sucursal
+    `, [startDate, endDate]);
+
+    // Enrich with sucursal names
+    if (result.rows.length > 0) {
+      const sucIds = [...new Set(result.rows.map(r => r.sucursal_id))];
+      const sucResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre FROM sucursales WHERE id = ANY($1)`, [sucIds]
+      );
+      const sucMap = {};
+      sucResult.rows.forEach(s => { sucMap[s.id] = s.nombre; });
+      result.rows.forEach(r => {
+        r.sucursal_nombre = sucMap[r.sucursal_id] || `Sucursal #${r.sucursal_id}`;
+      });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error consultando pedidos ya:', err.message);
+    res.status(500).json({ error: 'Error al consultar pedidos ya' });
+  }
+});
+
 // ========== PRODUCTOS VENCIDOS ==========
 
 // GET /api/productos-vencidos - resumen de productos vencidos por sucursal para un mes

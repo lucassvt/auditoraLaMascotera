@@ -255,6 +255,28 @@ export const AuditProvider = ({ children }) => {
       .catch(err => console.error('Error cargando productos vencidos:', err));
   };
 
+  // Pedidos pendientes de facturar y transferencias por sucursal
+  const [pedidosPendientes, setPedidosPendientes] = useState([]);
+
+  const fetchPedidosPendientes = (mes) => {
+    if (!mes) return;
+    fetch(`${API_BASE}/pedidos-pendientes?mes=${mes}`)
+      .then(res => res.json())
+      .then(data => setPedidosPendientes(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error cargando pedidos pendientes:', err));
+  };
+
+  // Pedidos Ya porcentaje por sucursal
+  const [pedidosYaData, setPedidosYaData] = useState([]);
+
+  const fetchPedidosYa = (mes) => {
+    if (!mes) return;
+    fetch(`${API_BASE}/pedidos-ya?mes=${mes}`)
+      .then(res => res.json())
+      .then(data => setPedidosYaData(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error cargando pedidos ya:', err));
+  };
+
   useEffect(() => {
     fetchTareasResumen();
     fetchConteosStock();
@@ -525,6 +547,10 @@ export const AuditProvider = ({ children }) => {
     ajustarConteoStock,
     productosVencidos,
     fetchProductosVencidos,
+    pedidosPendientes,
+    fetchPedidosPendientes,
+    pedidosYaData,
+    fetchPedidosYa,
     auditoresPorSucursal,
     updateAuditoresSucursal,
     getAuditoresSucursal,

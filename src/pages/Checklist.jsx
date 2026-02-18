@@ -36,8 +36,9 @@ import { useNavigate } from 'react-router-dom';
 const Checklist = () => {
   const {
     auditData, setAuditData, sucursalesNombres, sucursalesDB, tareasResumen, conteosStock,
-    fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, productosVencidos, fetchProductosVencidos, updateAuditoresSucursal,
-    getAuditoresSucursal, generateReport, getReportTypesForSucursalMes,
+    fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, productosVencidos, fetchProductosVencidos,
+    pedidosPendientes, fetchPedidosPendientes, pedidosYaData, fetchPedidosYa,
+    updateAuditoresSucursal, getAuditoresSucursal, generateReport, getReportTypesForSucursalMes,
     observaciones, fetchObservaciones, createObservacion, updateObservacionEstado, deleteObservacion,
     currentUser, isAuditor, userDisplayName
   } = useAudit();
@@ -339,6 +340,8 @@ const Checklist = () => {
     fetchTareasResumen(mesKey);
     fetchConteosStock(mesKey);
     fetchProductosVencidos(mesKey);
+    fetchPedidosPendientes(mesKey);
+    fetchPedidosYa(mesKey);
   }, [mesKey]);
 
   // Cargar tareas detalle cuando cambia la sucursal
@@ -408,6 +411,18 @@ const Checklist = () => {
     const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
     if (!sucDB) return null;
     return productosVencidos.find(v => v.sucursal_id === sucDB.id) || null;
+  };
+
+  const getPedidosPendientes = () => {
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
+    if (!sucDB) return null;
+    return pedidosPendientes.find(p => p.sucursal_id === sucDB.id) || null;
+  };
+
+  const getPedidosYa = () => {
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
+    if (!sucDB) return null;
+    return pedidosYaData.find(p => p.sucursal_id === sucDB.id) || null;
   };
 
   // --- Historial de auditorías en localStorage ---
@@ -1148,6 +1163,85 @@ const Checklist = () => {
                         </>
                       ) : (
                         <p className="text-sm text-mascotera-text-muted text-center py-3">No hay alimentos vencidos registrados para este periodo</p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {pilarKey === 'gestionAdministrativa' && (() => {
+                  const pendientes = getPedidosPendientes();
+                  return (
+                    <div className="mb-6 bg-mascotera-card border border-mascotera-border rounded-xl p-4">
+                      <h5 className="text-sm font-semibold text-mascotera-text mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-mascotera-warning rounded-full"></span>
+                        Dato Anexo - Pedidos Pendientes
+                      </h5>
+                      {pendientes && (parseInt(pendientes.pendientes_facturar) > 0 || parseInt(pendientes.transferencias_pendientes) > 0) ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-mascotera-darker p-3 rounded-lg">
+                            <p className="text-xs text-mascotera-text-muted mb-1">Pendientes de Facturar</p>
+                            <p className="text-2xl font-bold text-mascotera-warning">{pendientes.pendientes_facturar}</p>
+                            <p className="text-xs text-mascotera-text-muted mt-1">
+                              ${parseFloat(pendientes.monto_pendiente_facturar).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div className="bg-mascotera-darker p-3 rounded-lg">
+                            <p className="text-xs text-mascotera-text-muted mb-1">Transferencias Pendientes</p>
+                            <p className="text-2xl font-bold text-mascotera-info">{pendientes.transferencias_pendientes}</p>
+                            <p className="text-xs text-mascotera-text-muted mt-1">
+                              ${parseFloat(pendientes.monto_transferencias_pendientes).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-mascotera-text-muted text-center py-3">No hay pedidos pendientes para este periodo</p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {pilarKey === 'gestionPedidos' && (() => {
+                  const peya = getPedidosYa();
+                  return (
+                    <div className="mb-6 bg-mascotera-card border border-mascotera-border rounded-xl p-4">
+                      <h5 className="text-sm font-semibold text-mascotera-text mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-mascotera-accent rounded-full"></span>
+                        Dato Anexo - Pedidos Ya
+                      </h5>
+                      {peya && parseInt(peya.total_pedidos) > 0 ? (
+                        <>
+                          <div className="flex items-center justify-center mb-3">
+                            <div className="relative w-28 h-28">
+                              <svg className="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
+                                <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="10" fill="none" className="text-mascotera-darker" />
+                                <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="10" fill="none"
+                                  className="text-mascotera-accent"
+                                  strokeDasharray={`${parseFloat(peya.porcentaje_pedidos_ya) * 3.14} ${314 - parseFloat(peya.porcentaje_pedidos_ya) * 3.14}`}
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xl font-bold text-mascotera-accent">{peya.porcentaje_pedidos_ya}%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-mascotera-darker p-2 rounded-lg text-center">
+                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Total Pedidos</p>
+                              <p className="text-lg font-bold text-mascotera-text">{peya.total_pedidos}</p>
+                            </div>
+                            <div className="bg-mascotera-darker p-2 rounded-lg text-center">
+                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Pedidos Ya</p>
+                              <p className="text-lg font-bold text-mascotera-accent">{peya.pedidos_ya}</p>
+                            </div>
+                            <div className="bg-mascotera-darker p-2 rounded-lg text-center">
+                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Monto PeYa</p>
+                              <p className="text-sm font-bold text-mascotera-accent">${parseFloat(peya.monto_pedidos_ya).toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-mascotera-text-muted text-center py-3">No hay pedidos registrados para este periodo</p>
                       )}
                     </div>
                   );
