@@ -1202,46 +1202,50 @@ const Checklist = () => {
 
                 {pilarKey === 'gestionPedidos' && (() => {
                   const peya = getPedidosYa();
+                  const pctCancel = peya ? parseFloat(peya.porcentaje_cancelados) : 0;
+                  const cancelColor = pctCancel >= 10 ? 'text-mascotera-danger' : pctCancel >= 5 ? 'text-mascotera-warning' : 'text-mascotera-success';
+                  const cancelRingColor = pctCancel >= 10 ? 'text-mascotera-danger' : pctCancel >= 5 ? 'text-mascotera-warning' : 'text-mascotera-success';
                   return (
                     <div className="mb-6 bg-mascotera-card border border-mascotera-border rounded-xl p-4">
                       <h5 className="text-sm font-semibold text-mascotera-text mb-3 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-mascotera-accent rounded-full"></span>
-                        Dato Anexo - Pedidos Ya
+                        <span className="w-2 h-2 bg-mascotera-danger rounded-full"></span>
+                        Dato Anexo - Pedidos Ya Cancelados
                       </h5>
-                      {peya && parseInt(peya.total_pedidos) > 0 ? (
+                      {peya && parseInt(peya.total_pedidos_ya) > 0 ? (
                         <>
                           <div className="flex items-center justify-center mb-3">
                             <div className="relative w-28 h-28">
                               <svg className="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
                                 <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="10" fill="none" className="text-mascotera-darker" />
                                 <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="10" fill="none"
-                                  className="text-mascotera-accent"
-                                  strokeDasharray={`${parseFloat(peya.porcentaje_pedidos_ya) * 3.14} ${314 - parseFloat(peya.porcentaje_pedidos_ya) * 3.14}`}
+                                  className={cancelRingColor}
+                                  strokeDasharray={`${pctCancel * 3.14} ${314 - pctCancel * 3.14}`}
                                   strokeLinecap="round"
                                 />
                               </svg>
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-xl font-bold text-mascotera-accent">{peya.porcentaje_pedidos_ya}%</span>
+                              <div className="absolute inset-0 flex items-center justify-center flex-col">
+                                <span className={`text-xl font-bold ${cancelColor}`}>{peya.porcentaje_cancelados}%</span>
+                                <span className="text-[9px] text-mascotera-text-muted">cancelados</span>
                               </div>
                             </div>
                           </div>
                           <div className="grid grid-cols-3 gap-3">
                             <div className="bg-mascotera-darker p-2 rounded-lg text-center">
-                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Total Pedidos</p>
-                              <p className="text-lg font-bold text-mascotera-text">{peya.total_pedidos}</p>
+                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Total PeYa</p>
+                              <p className="text-lg font-bold text-mascotera-text">{peya.total_pedidos_ya}</p>
                             </div>
                             <div className="bg-mascotera-darker p-2 rounded-lg text-center">
-                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Pedidos Ya</p>
-                              <p className="text-lg font-bold text-mascotera-accent">{peya.pedidos_ya}</p>
+                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Cancelados</p>
+                              <p className={`text-lg font-bold ${cancelColor}`}>{peya.cancelados}</p>
                             </div>
                             <div className="bg-mascotera-darker p-2 rounded-lg text-center">
-                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Monto PeYa</p>
-                              <p className="text-sm font-bold text-mascotera-accent">${parseFloat(peya.monto_pedidos_ya).toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+                              <p className="text-[10px] text-mascotera-text-muted mb-0.5">Monto Cancelado</p>
+                              <p className={`text-sm font-bold ${cancelColor}`}>${parseFloat(peya.monto_cancelados).toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
                             </div>
                           </div>
                         </>
                       ) : (
-                        <p className="text-sm text-mascotera-text-muted text-center py-3">No hay pedidos registrados para este periodo</p>
+                        <p className="text-sm text-mascotera-text-muted text-center py-3">No hay pedidos de Pedidos Ya para este periodo</p>
                       )}
                     </div>
                   );

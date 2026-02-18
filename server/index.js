@@ -591,9 +591,9 @@ app.get('/api/pedidos-pendientes', async (req, res) => {
   }
 });
 
-// ========== PEDIDOS YA (Gestión de Pedidos) ==========
+// ========== PEDIDOS YA - CANCELADOS (Gestión de Pedidos) ==========
 
-// GET /api/pedidos-ya - porcentaje de pedidos de Pedidos Ya por sucursal en un mes
+// GET /api/pedidos-ya - porcentaje de pedidos cancelados de Pedidos Ya por sucursal en un mes
 app.get('/api/pedidos-ya', async (req, res) => {
   try {
     const { mes } = req.query; // formato: 2026-01
@@ -607,21 +607,22 @@ app.get('/api/pedidos-ya', async (req, res) => {
     const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
     const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
 
+    // Solo pedidos del cliente "PEDIDOS YA", separando cancelados vs total
     const result = await poolDuxIntegrada.query(`
       SELECT
         id_sucursal AS sucursal_id,
-        COUNT(*) AS total_pedidos,
-        COUNT(*) FILTER (WHERE UPPER(cliente) LIKE '%PEDIDOS YA%') AS pedidos_ya,
+        COUNT(*) AS total_pedidos_ya,
+        COUNT(*) FILTER (WHERE anulado_boolean = true) AS cancelados,
         COALESCE(SUM(CAST(NULLIF(total, '') AS numeric)), 0) AS monto_total,
-        COALESCE(SUM(CASE WHEN UPPER(cliente) LIKE '%PEDIDOS YA%' THEN CAST(NULLIF(total, '') AS numeric) ELSE 0 END), 0) AS monto_pedidos_ya,
+        COALESCE(SUM(CASE WHEN anulado_boolean = true THEN CAST(NULLIF(total, '') AS numeric) ELSE 0 END), 0) AS monto_cancelados,
         ROUND(
           CASE WHEN COUNT(*) > 0
-            THEN (COUNT(*) FILTER (WHERE UPPER(cliente) LIKE '%PEDIDOS YA%'))::numeric / COUNT(*)::numeric * 100
+            THEN (COUNT(*) FILTER (WHERE anulado_boolean = true))::numeric / COUNT(*)::numeric * 100
             ELSE 0
           END, 1
-        ) AS porcentaje_pedidos_ya
+        ) AS porcentaje_cancelados
       FROM pedidos
-      WHERE (anulado_boolean IS NOT TRUE OR anulado_boolean IS NULL)
+      WHERE UPPER(cliente) LIKE '%PEDIDOS YA%'
         AND fecha::timestamp >= $1
         AND fecha::timestamp < $2
       GROUP BY id_sucursal
