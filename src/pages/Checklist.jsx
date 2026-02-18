@@ -36,7 +36,7 @@ import { useNavigate } from 'react-router-dom';
 const Checklist = () => {
   const {
     auditData, setAuditData, sucursalesNombres, sucursalesDB, tareasResumen, conteosStock,
-    fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, updateAuditoresSucursal,
+    fetchTareasResumen, fetchTareasSucursal, fetchConteosStock, productosVencidos, fetchProductosVencidos, updateAuditoresSucursal,
     getAuditoresSucursal, generateReport, getReportTypesForSucursalMes,
     observaciones, fetchObservaciones, createObservacion, updateObservacionEstado, deleteObservacion,
     currentUser, isAuditor, userDisplayName
@@ -338,6 +338,7 @@ const Checklist = () => {
   useEffect(() => {
     fetchTareasResumen(mesKey);
     fetchConteosStock(mesKey);
+    fetchProductosVencidos(mesKey);
   }, [mesKey]);
 
   // Cargar tareas detalle cuando cambia la sucursal
@@ -400,6 +401,13 @@ const Checklist = () => {
     const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
     if (!sucDB) return [];
     return conteosStock.filter(c => c.sucursal_id === sucDB.id);
+  };
+
+  // Helper: get productos vencidos for current sucursal
+  const getVencidos = () => {
+    const sucDB = sucursalesDB.find(s => s.nombre.replace(/^SUCURSAL\s+/i, '') === selectedSucursal);
+    if (!sucDB) return null;
+    return productosVencidos.find(v => v.sucursal_id === sucDB.id) || null;
   };
 
   // --- Historial de auditorías en localStorage ---
@@ -1107,6 +1115,39 @@ const Checklist = () => {
                         </>
                       ) : (
                         <p className="text-sm text-mascotera-text-muted text-center py-3">No hay conteos de stock registrados para este periodo</p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {pilarKey === 'stockCaja' && (() => {
+                  const vencidos = getVencidos();
+                  return (
+                    <div className="mb-6 bg-mascotera-card border border-mascotera-border rounded-xl p-4">
+                      <h5 className="text-sm font-semibold text-mascotera-text mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-mascotera-danger rounded-full"></span>
+                        Dato Anexo - Alimentos Vencidos
+                      </h5>
+                      {vencidos && (vencidos.total_productos > 0 || vencidos.total_unidades > 0) ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                              <p className="text-xs text-mascotera-text-muted mb-1">Productos</p>
+                              <p className="text-lg font-bold text-mascotera-danger">{vencidos.total_productos}</p>
+                            </div>
+                            <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                              <p className="text-xs text-mascotera-text-muted mb-1">Unidades</p>
+                              <p className="text-lg font-bold text-mascotera-warning">{vencidos.total_unidades}</p>
+                            </div>
+                            <div className="bg-mascotera-darker p-3 rounded-lg text-center">
+                              <p className="text-xs text-mascotera-text-muted mb-1">Monto Total</p>
+                              <p className="text-lg font-bold text-mascotera-danger">${parseFloat(vencidos.monto_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-mascotera-text-muted text-center">Productos vencidos sin acción comercial ni movimiento entre sucursales</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-mascotera-text-muted text-center py-3">No hay alimentos vencidos registrados para este periodo</p>
                       )}
                     </div>
                   );

@@ -244,6 +244,17 @@ export const AuditProvider = ({ children }) => {
     }
   };
 
+  // Productos vencidos por sucursal
+  const [productosVencidos, setProductosVencidos] = useState([]);
+
+  const fetchProductosVencidos = (mes) => {
+    if (!mes) return;
+    fetch(`${API_BASE}/productos-vencidos?mes=${mes}`)
+      .then(res => res.json())
+      .then(data => setProductosVencidos(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error cargando productos vencidos:', err));
+  };
+
   useEffect(() => {
     fetchTareasResumen();
     fetchConteosStock();
@@ -512,6 +523,8 @@ export const AuditProvider = ({ children }) => {
     conteosPendientes,
     fetchConteosPendientes,
     ajustarConteoStock,
+    productosVencidos,
+    fetchProductosVencidos,
     auditoresPorSucursal,
     updateAuditoresSucursal,
     getAuditoresSucursal,

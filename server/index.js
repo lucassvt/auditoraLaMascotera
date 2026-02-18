@@ -540,6 +540,95 @@ app.delete('/api/informes/:id', async (req, res) => {
   }
 });
 
+// ========== PRODUCTOS VENCIDOS ==========
+
+// GET /api/productos-vencidos - resumen de productos vencidos por sucursal para un mes
+app.get('/api/productos-vencidos', async (req, res) => {
+  try {
+    const { mes } = req.query; // formato: 2026-01
+    if (!mes) {
+      return res.status(400).json({ error: 'El parámetro mes es requerido (formato: YYYY-MM)' });
+    }
+
+    const [year, month] = mes.split('-');
+    const startDate = `${year}-${month}-01`;
+    const endMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+    const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+    const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+    // Productos cuya fecha_vencimiento cae en el mes seleccionado
+    // y que NO fueron vendidos/movidos (quedaron vencidos sin acción)
+    const result = await poolMiSucursal.query(`
+      SELECT
+        sucursal_id,
+        COUNT(*) AS total_productos,
+        SUM(cantidad) AS total_unidades,
+        COALESCE(SUM(valor_total), 0) AS monto_total
+      FROM productos_vencimientos
+      WHERE fecha_vencimiento >= $1
+        AND fecha_vencimiento < $2
+        AND (tiene_accion_comercial = false OR tiene_accion_comercial IS NULL)
+        AND sucursal_destino_id IS NULL
+        AND estado NOT IN ('vendido', 'retirado', 'movido')
+      GROUP BY sucursal_id
+      ORDER BY sucursal_id
+    `, [startDate, endDate]);
+
+    // Enrich with sucursal names
+    if (result.rows.length > 0) {
+      const sucIds = [...new Set(result.rows.map(r => r.sucursal_id))];
+      const sucResult = await poolDuxIntegrada.query(
+        `SELECT id, nombre FROM sucursales WHERE id = ANY($1)`, [sucIds]
+      );
+      const sucMap = {};
+      sucResult.rows.forEach(s => { sucMap[s.id] = s.nombre; });
+      result.rows.forEach(r => {
+        r.sucursal_nombre = sucMap[r.sucursal_id] || `Sucursal #${r.sucursal_id}`;
+      });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error consultando productos vencidos:', err.message);
+    res.status(500).json({ error: 'Error al consultar productos vencidos' });
+  }
+});
+
+// GET /api/productos-vencidos/:sucursalId - detalle de productos vencidos de una sucursal
+app.get('/api/productos-vencidos/:sucursalId', async (req, res) => {
+  try {
+    const { sucursalId } = req.params;
+    const { mes } = req.query;
+    if (!mes) {
+      return res.status(400).json({ error: 'El parámetro mes es requerido (formato: YYYY-MM)' });
+    }
+
+    const [year, month] = mes.split('-');
+    const startDate = `${year}-${month}-01`;
+    const endMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+    const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+    const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+    const result = await poolMiSucursal.query(`
+      SELECT id, producto, cantidad, precio_unitario, valor_total,
+             fecha_vencimiento, estado, notas
+      FROM productos_vencimientos
+      WHERE sucursal_id = $1
+        AND fecha_vencimiento >= $2
+        AND fecha_vencimiento < $3
+        AND (tiene_accion_comercial = false OR tiene_accion_comercial IS NULL)
+        AND sucursal_destino_id IS NULL
+        AND estado NOT IN ('vendido', 'retirado', 'movido')
+      ORDER BY valor_total DESC
+    `, [sucursalId, startDate, endDate]);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error consultando productos vencidos por sucursal:', err.message);
+    res.status(500).json({ error: 'Error al consultar productos vencidos' });
+  }
+});
+
 // ========== OBSERVACIONES POR PILAR ==========
 
 // Crear tabla si no existe (se ejecuta al iniciar)
