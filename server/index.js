@@ -84,6 +84,7 @@ app.get('/api/sucursales', async (req, res) => {
       SELECT id, nombre, codigo, tiene_veterinaria, tiene_peluqueria, activo as activa
       FROM sucursales
       WHERE activo = true
+        AND codigo LIKE 'SUC%'
         AND nombre NOT ILIKE '%pets plus%'
         AND nombre NOT ILIKE '%contact center%'
       ORDER BY nombre
